@@ -115,6 +115,35 @@ void TIM7_IRQHandler(){
 
 }
 
+// ask nicole for questions/concerns
+void init_i2c(void) {
+    RCC->AHBENR |= RCC_AHBENR_GPIOAEN; // initialize clock for I2C
+
+    // configure PA9->I2C1_SCL (GPIOA-AF4), PA10->I2C1_SDA (GPIOA-AF4)
+    GPIOA->MODER &= ~0x3c0000; // reset PA9&PA10
+    GPIOA->MODER |= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // configure PA9&PA10 to AF mode
+    GPIOA->AFR[1] |= GPIO_AFRH_AFRH2; // AFR to AF4
+
+    RCC->APB1ENR |= RCC_APB1ENR_I2C1EN; // configure clock for I2C1
+    I2C1->CR1 &= ~I2C_CR1_PE; // disable I2C peripheral for setting programming
+
+    /**
+     * control register settings 1:
+     * -turn off analog noise filter
+     * -enable error interrupts 
+     * -disable clock stretching
+     */
+    I2C1->CR1 |= I2C_CR1_ANFOFF | I2C_CR1_ERRIE | I2C_CR1_NOSTRETCH; 
+    
+    // set the I2C to "fast mode" @400kHz
+    I2C1->TIMINGR = (u_int32_t) 0x00B01A4B; // hex number came from example don't ask me about it
+    
+    I2C1->CR2 &= ~I2C_CR2_ADD10; // 7-bit addressing, not 10-bit (for master mode)
+    I2C1->CR2 |= I2C_CR2_STOP; // send STOP condiciton after last byte of transmission
+
+    I2C1->CR1 |= I2C_CR1_PE; // enable peripheral after programming
+}
+
 int main(void) {
     internal_clock();
     //call setup functions
