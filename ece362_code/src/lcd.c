@@ -16,8 +16,8 @@ lcd_dev_t lcddev;
 
 #define CS_NUM  8
 #define CS_BIT  (1<<CS_NUM)
-#define CS_HIGH do { GPIOB->BSRR = GPIO_BSRR_BS_8; } while(0)
-#define CS_LOW do { GPIOB->BSRR = GPIO_BSRR_BR_8; } while(0)
+#define CS_HIGH do { GPIOB->BSRR = GPIO_BSRR_BS_8; } while(0)   // set TFT chip select high
+#define CS_LOW do { GPIOB->BSRR = GPIO_BSRR_BR_8; } while(0)    // set TFT chip select low
 #define RESET_NUM 11
 #define RESET_BIT (1<<RESET_NUM)
 #define RESET_HIGH do { GPIOB->BSRR = GPIO_BSRR_BS_11; } while(0) // set TFT reset high
@@ -76,67 +76,7 @@ void LCD_Reset(void)
     nano_wait(50000000);  // Wait
 }
 
-// If you want to try the slower version of SPI, #define SLOW_SPI
-
-#if defined(SLOW_SPI)
-
-// What GPIO port and SPI channel are we using here?
-#define CSPORT GPIOB
-#define LCD_CS    10 /* also known as NSS */
-#define RSPORT GPIOA
-#define LCD_RS    3
-#define RESETPORT GPIOB
-#define LCD_RESET 11
-
-#define LCD_CS_SET  do { while((SPI->SR & SPI_SR_BSY) != 0); CSPORT->BSRR=1<<LCD_CS; } while(0)
-#define LCD_RS_SET  RSPORT->BSRR=1<<LCD_RS
-#define LCD_RESET_SET RESETPORT->BSRR=1<<LCD_RESET
-
-#define LCD_CS_CLR  CSPORT->BRR=1<<LCD_CS
-#define LCD_RS_CLR  RSPORT->BRR=1<<LCD_RS
-#define LCD_RESET_CLR RESETPORT->BRR=1<<LCD_RESET
-
-// Write a byte to SPI.
-void SPI_WriteByte(uint8_t Data)
-{
-    while((SPI->SR & SPI_SR_TXE) == 0)
-        ;
-    *((volatile uint8_t*)&SPI->DR) = Data;
-}
-
-// Write to an LCD "register"
-void LCD_WR_REG(uint8_t data)
-{
-    lcddev.reg_select(1);
-    SPI_WriteByte(data);
-}
-
-// Write 8-bit data to the LCD
-void LCD_WR_DATA(uint8_t data)
-{
-    lcddev.reg_select(0);
-    SPI_WriteByte(data);
-}
-
-// Prepare to write 16-bit data to the LCD
-void LCD_WriteData16_Prepare()
-{
-    lcddev.reg_select(0);
-}
-
-// Write 16-bit data
-void LCD_WriteData16(u16 Data)
-{
-    SPI_WriteByte(Data>>8);
-    SPI_WriteByte(Data);
-}
-
-// Finish writing 16-bit data
-void LCD_WriteData16_End()
-{
-}
-
-#else /* not SLOW_SPI */
+// NOT using slow SPI
 
 // Write to an LCD "register"
 void LCD_WR_REG(uint8_t data)
@@ -177,7 +117,6 @@ void LCD_WriteData16_End()
 {
     SPI->CR2 &= ~SPI_CR2_DS; // bad value forces it back to 8-bit mode
 }
-#endif /* not SLOW_SPI */
 
 // Select an LCD "register" and write 8-bit data to it.
 void LCD_WriteReg(uint8_t LCD_Reg, uint16_t LCD_RegValue)
