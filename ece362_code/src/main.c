@@ -33,7 +33,7 @@ uint16_t zhist[30]; //z value history
 
 //some type of grid to represent the pixels
 
-uint8_t pgrid[320][240]; //(represent with a 0/1)
+static uint8_t pgrid[40][240]; //(represent with a 0/1)
 
 
 void init_dmas(void) {
@@ -47,23 +47,24 @@ void init_dmas(void) {
    DMA1_Channel1 -> CNDTR = 0xf;
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_DIR); // read from peripheral
    DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
-   // may need circ?
+   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
    DMA1_Channel1 -> CCR |= DMA_CCR_PSIZE_0; // 01 - 16b
    
    DMA1_Channel2 -> CMAR = (uint32_t) &yVal;
-   DMA1_Channel2 -> CPAR = (uint32_t) &(ADC1 -> DR); // Look into
+   DMA1_Channel2 -> CPAR = (uint32_t) &(ADC1 -> DR);
    DMA1_Channel2 -> CNDTR = 0xf;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_DIR);
    DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
+   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_MSIZE);
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_PSIZE);
    DMA1_Channel2 -> CCR |= DMA_CCR_MSIZE_0;
    DMA1_Channel2 -> CCR |= DMA_CCR_PSIZE_0;
    
-   ///*
+   /*
    DMA1_Channel3 -> CMAR = (uint32_t) &pgrid;
    DMA1_Channel3 -> CPAR = (uint32_t) &(SPI1 -> DR); // Look into
    DMA1_Channel3 -> CNDTR = 0x4b00;
@@ -74,7 +75,7 @@ void init_dmas(void) {
    DMA1_Channel3 -> CCR &= ~(DMA_CCR_PSIZE);
    DMA1_Channel3 -> CCR |= DMA_CCR_MSIZE_0;
    DMA1_Channel3 -> CCR |= DMA_CCR_PSIZE_0;
-   //*/
+   */
 
 }
 
@@ -104,12 +105,15 @@ void readXY(void) {
     ADC1 -> CHSELR = 0b1;
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
+    while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
 
     SYSCFG -> CFGR1 |= 0b100000000;
     //Use DMA Channel 2 (Y)
     ADC1 -> CHSELR = 0;
     ADC1 -> CHSELR = 0b10;
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
+    ADC1 -> CR |= ADC_CR_ADSTART;
+    while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
 }
 
 //used as an interrupt to refresh the LCD display & read the acceleration at 30Hz
@@ -150,6 +154,7 @@ void init_tim7(void) {
 // check x-y position, refresh the screen 
 void TIM6_IRQHandler(){
     TIM6->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
+    readXY();
     //read X
     //read Y
     //check for shaking
@@ -308,7 +313,7 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
             return -1;
         }
         // mask data[i] with I2C_TXDR_TXDATA to make sure only 8 bits long, write to TXDR
-        I2C1->TXDR |= I2C_TXDR_TXDATA_Msk & data[];
+        I2C1->TXDR |= I2C_TXDR_TXDATA_Msk & data[count]; // EDITED PLS DOUBLE CHECK
     }
 
     // wait until transmission complete or not acknowledge are set
@@ -321,6 +326,9 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
     i2c_stop();
     return 0;
 }
+/*
+
+TODO: UNCOMMENT
 
 //===========================================================================
 // Receive size chars from the I2C bus at targadr and store in data[size].
@@ -345,7 +353,7 @@ int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
 
     }
 }
-
+*/
 //===========================================================================
 // Clear the NACK bit. (One-liner!)
 //===========================================================================
@@ -359,7 +367,11 @@ void i2c_clearnack(void) {
 //===========================================================================
 int i2c_checknack(void) {
     // check to make sure the NACK flag is cleared
-    if (!I2C_ISR_NACKF) {return 1;}
+    if (!I2C_ISR_NACKF) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 
@@ -367,11 +379,12 @@ int i2c_checknack(void) {
 int main(void) {
     internal_clock();
     //call setup functions
-    //setup_adcs();
-    //init_dmas();
+    setup_adcs();
+    init_dmas();
+    enable_dmas();
     
     //init_I2C();
-    init_spi();
+    init_spi1();
     
     init_tim6();
     init_tim7();
