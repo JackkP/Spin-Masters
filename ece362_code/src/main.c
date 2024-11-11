@@ -33,7 +33,7 @@ uint16_t zhist[30]; //z value history
 
 //some type of grid to represent the pixels
 
-//uint8_t pgrid[320][240] (represent with a 0/1)
+uint8_t pgrid[320][240]; //(represent with a 0/1)
 
 
 void init_dmas(void) {
@@ -47,6 +47,7 @@ void init_dmas(void) {
    DMA1_Channel1 -> CNDTR = 0xf;
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_DIR); // read from peripheral
    DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
+   // may need circ?
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
@@ -61,6 +62,19 @@ void init_dmas(void) {
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_PSIZE);
    DMA1_Channel2 -> CCR |= DMA_CCR_MSIZE_0;
    DMA1_Channel2 -> CCR |= DMA_CCR_PSIZE_0;
+   
+   ///*
+   DMA1_Channel3 -> CMAR = (uint32_t) &pgrid;
+   DMA1_Channel3 -> CPAR = (uint32_t) &(SPI1 -> DR); // Look into
+   DMA1_Channel3 -> CNDTR = 0x4b00;
+   DMA1_Channel3 -> CCR |= DMA_CCR_DIR;
+   DMA1_Channel3 -> CCR |= DMA_CCR_MINC;
+   DMA1_Channel3 -> CCR |= DMA_CCR_PINC;
+   DMA1_Channel3 -> CCR &= ~(DMA_CCR_MSIZE);
+   DMA1_Channel3 -> CCR &= ~(DMA_CCR_PSIZE);
+   DMA1_Channel3 -> CCR |= DMA_CCR_MSIZE_0;
+   DMA1_Channel3 -> CCR |= DMA_CCR_PSIZE_0;
+   //*/
 
 }
 
