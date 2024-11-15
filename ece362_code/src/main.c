@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "lcd.h"
+#include "spi.h"
 
 void nano_wait(int);
 void internal_clock();
@@ -18,8 +19,8 @@ void internal_clock();
 uint16_t xVal = 0; //analog xvalue
 uint16_t yVal = 0; //analog yvalue
 
-uint16_t xCurr = 0; //x coordinate
-uint16_t yCurr = 0; //y coordinate
+uint32_t xCurr = 0; //x coordinate
+uint32_t yCurr = 0; //y coordinate
 
 uint16_t x_0 = 0; //zero x-acceleration
 uint16_t y_0 = 0; //zero y-acceleration
@@ -106,6 +107,7 @@ void readXY(void) {
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
     while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
+    xVal = ADC1->DR; //replace with triggering a DMA transfer
 
     SYSCFG -> CFGR1 |= 0b100000000;
     //Use DMA Channel 2 (Y)
@@ -114,16 +116,17 @@ void readXY(void) {
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
     while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
+    yVal = ADC1->DR; //replace with triggering a DMA transfer
 }
 
-//used as an interrupt to refresh the LCD display & read the acceleration at 30Hz
+//used as an interrupt to refresh the LCD display & read the acceleration at 20Hz
 void init_tim6(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
-    //Set prescaler to 2 - 1
-    TIM6->PSC = 2 - 1;
-    //Calculate ARR for 30 Hz interrupt rate
-    TIM6->ARR = (24000000 / 30) - 1;
+    //Set prescaler to 10,000
+    TIM6->PSC = 10-1;
+    //Calculate ARR for 20 Hz interrupt rate
+    TIM6->ARR = 480-1;
     //Enable update interrupt
     TIM6->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
@@ -154,9 +157,11 @@ void init_tim7(void) {
 // check x-y position, refresh the screen 
 void TIM6_IRQHandler(){
     TIM6->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
+    //read X and Y
     readXY();
-    //read X
-    //read Y
+    xCurr = xVal*240/4095;
+    yCurr = yVal*320/4096;
+    LCD_DrawPoint(xCurr, yCurr, BLACK);
     //check for shaking
     //if shaking clear screen, save, wait till acelerometer is restored to flat
     //if tilting save screen and switch
@@ -166,38 +171,6 @@ void TIM6_IRQHandler(){
 void TIM7_IRQHandler(){
     TIM7->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     //save current screen to SD card
-}
-
-//setup spi1 peripheral to control TFT LCD display and SD card
-void init_spi1() {
-    //initalize GPIOB peripheral
-    
-    //PB2 SD chip select
-    //PB3 SCK
-    //PB4 MISO
-    //PB5 MOSI
-    //PB8 TFT chip select
-    //PB11 TFT Reset
-    //PB14 D/C (data/command) select signal, high = write data, low = write command
-
-    RCC->AHBENR |= RCC_AHBENR_GPIOBEN; // enable peripheral clock for PortB
-    GPIOB->MODER &= ~(0x30C30FF0); //clear MODER for PB2-5, 8, 11, 14
-    GPIOB->MODER |= 0x80008800; // set PA5, 7, 15 to alternate function
-    
-    GPIOA->AFR[0] &= ~(0xF0F00000); //set AFR for PA5, 7, to AF0
-    GPIOA->AFR[1] &= ~(0xF0000000); //set AFR for PA15 to AF0
-
-    //setup SPI2 peripheral
-    RCC->APB2ENR |= RCC_APB2ENR_SPI1EN; //enable clock to spi2
-    SPI1->CR1 &= ~(SPI_CR1_SPE); //disable the SPI channel
-    SPI1->CR1 |= SPI_CR1_BR; //set the baud rate to the minimum baud rate ck/256
-    SPI1->CR1 |= SPI_CR1_MSTR; //set to master mode
-    SPI1->CR2 |= SPI_CR2_DS; //set data size to 10 bit
-    SPI1->CR2 &= ~(SPI_CR2_DS_1 | SPI_CR2_DS_2);
-    SPI1->CR2 |= SPI_CR2_SSOE; //set the SS output enable bit
-    SPI1->CR2 |= SPI_CR2_NSSP; //enable NSSP mode
-    SPI1->CR2 |= SPI_CR2_TXDMAEN; //enable DMA transfer request upon transmit buffer empty
-    SPI1->CR1 |= SPI_CR1_SPE; //enable the SPI channel
 }
 
 //===========================================================================
@@ -385,6 +358,8 @@ int main(void) {
     
     //init_I2C();
     init_spi1();
+    LCD_Setup();
+    LCD_Clear(WHITE);
     
     init_tim6();
     init_tim7();
