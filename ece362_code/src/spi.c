@@ -19,12 +19,13 @@ void init_spi1() {
     GPIOA->AFR[0] &= ~(0x00000FC0); //set AFR for PB3-5, to AF0
         
     GPIOB->MODER |= 0x10410010; //set PB2, 8, 11, 14 to P/P output
-    GPIOB->OTYPER |= 0x4904;
+    //GPIOB->OTYPER |= 0x4904;
     
     //setup SPI1 peripheral
     RCC->APB2ENR |= RCC_APB2ENR_SPI1EN; //enable clock to spi1
     SPI1->CR1 &= ~(SPI_CR1_SPE); //disable the SPI channel
     SPI1->CR1 &= ~(SPI_CR1_BR); //set the baud rate to 12 MHz
+    
     SPI1->CR1 |= SPI_CR1_BR_0;
 
     SPI1->CR1 |= SPI_CR1_MSTR; //set to master mode
@@ -33,6 +34,5 @@ void init_spi1() {
 
     SPI1->CR2 |= SPI_CR2_SSOE; //set the SS output enable bit
     SPI1->CR2 |= SPI_CR2_NSSP; //enable NSSP mode
-    SPI1->CR2 |= SPI_CR2_TXDMAEN; //enable DMA transfer request upon transmit buffer empty
     SPI1->CR1 |= SPI_CR1_SPE; //enable the SPI channel
 }
