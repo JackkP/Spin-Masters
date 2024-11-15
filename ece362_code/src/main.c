@@ -36,6 +36,8 @@ uint16_t zhist[30]; //z value history
 
 static uint8_t pgrid[40][240]; //(represent with a 0/1)
 
+int led_curr = 0;
+
 
 void init_dmas(void) {
    RCC -> AHBENR |= RCC_AHBENR_DMA1EN;
@@ -126,7 +128,7 @@ void init_tim6(void) {
     //Set prescaler to 10,000
     TIM6->PSC = 10-1;
     //Calculate ARR for 20 Hz interrupt rate
-    TIM6->ARR = 480-1;
+    TIM6->ARR = 4800-1;
     //Enable update interrupt
     TIM6->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
@@ -141,7 +143,7 @@ void init_tim7(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
     //Set prescaler to 10,000 - 1
-    TIM7->PSC = 10000 - 1;
+    TIM7->PSC = 100 - 1;
     //Calculate ARR for 0.5 Hz interrupt rate
     TIM6->ARR = (9600) - 1;
     //Enable update interrupt
@@ -151,6 +153,9 @@ void init_tim7(void) {
     //Enable counter
     TIM7->CR1 |= TIM_CR1_CEN;
     //TIM7->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
+
+    RCC->AHBENR |= RCC_AHBENR_GPIOCEN;  
+    GPIOC->MODER |= GPIO_MODER_MODER6_0;
 }
 
 // read the accelerometers, check for shaking/tilt
@@ -170,6 +175,15 @@ void TIM6_IRQHandler(){
 
 void TIM7_IRQHandler(){
     TIM7->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
+    
+    if (led_curr == 1) {
+        GPIOC->ODR |= 1 << 6;
+        led_curr = 0;
+    }
+    else {
+        GPIOC->ODR &= ~(1 << 6);
+        led_curr = 1;   
+    }
     //save current screen to SD card
 }
 
