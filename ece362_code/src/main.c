@@ -16,8 +16,9 @@
 void nano_wait(int);
 void internal_clock();
 
-uint16_t xVal = 0; //analog xvalue
-uint16_t yVal = 0; //analog yvalue
+uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
+//uint16_t xVal = 0; //analog xvalue
+//uint16_t yVal = 0; //analog yvalue
 
 uint32_t xCurr = 0; //x coordinate
 uint32_t yCurr = 0; //y coordinate
@@ -41,34 +42,35 @@ int led_curr = 0;
 
 void init_dmas(void) {
    RCC -> AHBENR |= RCC_AHBENR_DMA1EN;
-   DMA1 -> CSELR |= DMA1_CSELR_CH1_ADC;// Channel Select ADC on 1&2
-   DMA1 -> CSELR |= DMA1_CSELR_CH2_ADC;// Channel Select ADC on 1&2
+   //DMA1 -> CSELR |= DMA1_CSELR_CH1_ADC;// Channel Select ADC on 1
+   //DMA1 -> CSELR |= DMA1_CSELR_CH2_ADC;// Channel Select ADC on 2
 
    DMA1_Channel1 -> CCR &= ~DMA_CCR_EN; // X
    DMA1_Channel2 -> CCR &= ~DMA_CCR_EN; // Y
    
-   DMA1_Channel1 -> CMAR = (uint32_t) &xVal;
+   DMA1_Channel1 -> CMAR = (uint32_t) xyVals;
    DMA1_Channel1 -> CPAR = (uint32_t) &(ADC1 -> DR);
-   DMA1_Channel1 -> CNDTR = 0x1;
+   DMA1_Channel1 -> CNDTR = 0x2;
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_DIR); // read from peripheral
-   //DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
-   //DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
-   DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
-   DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
+   DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
+   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
+   DMA1_Channel1 -> CCR |= DMA_CCR_TEIE;
+   //DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
+   //DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
    DMA1_Channel1 -> CCR |= DMA_CCR_PSIZE_0; // 01 - 16b
-   
+   /*
    DMA1_Channel2 -> CMAR = (uint32_t) &yVal;
    DMA1_Channel2 -> CPAR = (uint32_t) &(ADC1 -> DR);
    DMA1_Channel2 -> CNDTR = 0x1;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_DIR);
-   //DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
-   //DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
+   DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
+   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_MSIZE);
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_PSIZE);
    DMA1_Channel2 -> CCR |= DMA_CCR_MSIZE_0;
    DMA1_Channel2 -> CCR |= DMA_CCR_PSIZE_0;
-   
+   */
    /*
    DMA1_Channel3 -> CMAR = (uint32_t) &pgrid;
    DMA1_Channel3 -> CPAR = (uint32_t) &(SPI1 -> DR); // Look into
@@ -98,7 +100,7 @@ void setup_adcs(void) {
 
     RCC -> APB2ENR |= RCC_APB2ENR_ADC1EN; //Enable ADC1
     ADC1 -> CFGR1 |= ADC_CFGR1_DMAEN;
-    //ADC1 -> CFGR1 |= ADC_CFGR1_DMACFG;
+    ADC1 -> CFGR1 |= ADC_CFGR1_DMACFG;
     
     RCC -> CR2 |= RCC_CR2_HSI14ON; //Clock?
     while((RCC -> CR2 & RCC_CR2_HSI14RDY) == 0);
@@ -107,23 +109,25 @@ void setup_adcs(void) {
 }
 
 void readXY(void) {
-    SYSCFG -> CFGR1 &= ~(0b100000000);
+    //SYSCFG -> CFGR1 &= ~(0b100000000);
     //Use DMA Channel 1 (X)
     ADC1 -> CHSELR = 0;
     ADC1 -> CHSELR = 0b1;
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
-    while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
+    //while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
     //xVal = ADC1->DR; //replace with triggering a DMA transfer
+    //DMA1 -> IFCR |= 0xff;
 
-    SYSCFG -> CFGR1 |= 0b100000000;
+    //SYSCFG -> CFGR1 |= 0b100000000;
     //Use DMA Channel 2 (Y)
     ADC1 -> CHSELR = 0;
     ADC1 -> CHSELR = 0b10;
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
-    while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
+    //while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
     //yVal = ADC1->DR; //replace with triggering a DMA transfer
+    //DMA1 -> IFCR |= 0xff;
 }
 
 //used as an interrupt to refresh the LCD display & read the acceleration at 20Hz
@@ -169,8 +173,8 @@ void TIM6_IRQHandler(){
     TIM6->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     //read X and Y
     readXY();
-    xCurr = xVal*240/4095;
-    yCurr = yVal*320/4096;
+    xCurr = xyVals[0]*240/4095;
+    yCurr = xyVals[1]*320/4096;
     LCD_DrawPoint(xCurr, yCurr, BLACK);
     //check for shaking
     //if shaking clear screen, save, wait till acelerometer is restored to flat
