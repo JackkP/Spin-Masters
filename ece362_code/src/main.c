@@ -41,16 +41,18 @@ int led_curr = 0;
 
 void init_dmas(void) {
    RCC -> AHBENR |= RCC_AHBENR_DMA1EN;
+   DMA1 -> CSELR |= DMA1_CSELR_CH1_ADC;// Channel Select ADC on 1&2
+   DMA1 -> CSELR |= DMA1_CSELR_CH2_ADC;// Channel Select ADC on 1&2
 
    DMA1_Channel1 -> CCR &= ~DMA_CCR_EN; // X
    DMA1_Channel2 -> CCR &= ~DMA_CCR_EN; // Y
    
    DMA1_Channel1 -> CMAR = (uint32_t) &xVal;
    DMA1_Channel1 -> CPAR = (uint32_t) &(ADC1 -> DR);
-   DMA1_Channel1 -> CNDTR = 0xf;
+   DMA1_Channel1 -> CNDTR = 0x1;
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_DIR); // read from peripheral
-   DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
-   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
+   //DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
+   //DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
@@ -58,10 +60,10 @@ void init_dmas(void) {
    
    DMA1_Channel2 -> CMAR = (uint32_t) &yVal;
    DMA1_Channel2 -> CPAR = (uint32_t) &(ADC1 -> DR);
-   DMA1_Channel2 -> CNDTR = 0xf;
+   DMA1_Channel2 -> CNDTR = 0x1;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_DIR);
-   DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
-   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
+   //DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
+   //DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_MSIZE);
    DMA1_Channel2 -> CCR &= ~(DMA_CCR_PSIZE);
    DMA1_Channel2 -> CCR |= DMA_CCR_MSIZE_0;
@@ -85,6 +87,7 @@ void init_dmas(void) {
 void enable_dmas(void) {
     DMA1_Channel1-> CCR |= DMA_CCR_EN;
     DMA1_Channel2-> CCR |= DMA_CCR_EN;
+    //DMA1_Channel2-> CCR |= DMA_CCR_EN;
 }
 
 void setup_adcs(void) {
@@ -94,6 +97,8 @@ void setup_adcs(void) {
     GPIOA -> MODER |= (GPIO_MODER_MODER0); //PA0
 
     RCC -> APB2ENR |= RCC_APB2ENR_ADC1EN; //Enable ADC1
+    ADC1 -> CFGR1 |= ADC_CFGR1_DMAEN;
+    //ADC1 -> CFGR1 |= ADC_CFGR1_DMACFG;
     
     RCC -> CR2 |= RCC_CR2_HSI14ON; //Clock?
     while((RCC -> CR2 & RCC_CR2_HSI14RDY) == 0);
@@ -109,7 +114,7 @@ void readXY(void) {
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
     while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
-    xVal = ADC1->DR; //replace with triggering a DMA transfer
+    //xVal = ADC1->DR; //replace with triggering a DMA transfer
 
     SYSCFG -> CFGR1 |= 0b100000000;
     //Use DMA Channel 2 (Y)
@@ -118,7 +123,7 @@ void readXY(void) {
     while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
     ADC1 -> CR |= ADC_CR_ADSTART;
     while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
-    yVal = ADC1->DR; //replace with triggering a DMA transfer
+    //yVal = ADC1->DR; //replace with triggering a DMA transfer
 }
 
 //used as an interrupt to refresh the LCD display & read the acceleration at 20Hz
