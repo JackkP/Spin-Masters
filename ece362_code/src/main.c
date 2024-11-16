@@ -59,19 +59,8 @@ void init_dmas(void) {
    //DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
    DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
    DMA1_Channel1 -> CCR |= DMA_CCR_PSIZE_0; // 01 - 16b
-   /*
-   DMA1_Channel2 -> CMAR = (uint32_t) &yVal;
-   DMA1_Channel2 -> CPAR = (uint32_t) &(ADC1 -> DR);
-   DMA1_Channel2 -> CNDTR = 0x1;
-   DMA1_Channel2 -> CCR &= ~(DMA_CCR_DIR);
-   DMA1_Channel2 -> CCR |= DMA_CCR_MINC;
-   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC;
-   DMA1_Channel2 -> CCR &= ~(DMA_CCR_MSIZE);
-   DMA1_Channel2 -> CCR &= ~(DMA_CCR_PSIZE);
-   DMA1_Channel2 -> CCR |= DMA_CCR_MSIZE_0;
-   DMA1_Channel2 -> CCR |= DMA_CCR_PSIZE_0;
-   */
-   /*
+
+   /* Do we still need DMA for pgrid?
    DMA1_Channel3 -> CMAR = (uint32_t) &pgrid;
    DMA1_Channel3 -> CPAR = (uint32_t) &(SPI1 -> DR); // Look into
    DMA1_Channel3 -> CNDTR = 0x4b00;
@@ -173,8 +162,8 @@ void TIM6_IRQHandler(){
     TIM6->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     //read X and Y
     readXY();
-    xCurr = xyVals[0]*240/4095;
-    yCurr = xyVals[1]*320/4096;
+    xCurr = (xyVals[0])*240/4095;
+    yCurr = (xyVals[1])*320/4096; // Should these denomenators be the same?
     LCD_DrawPoint(xCurr, yCurr, BLACK);
     //check for shaking
     //if shaking clear screen, save, wait till acelerometer is restored to flat
