@@ -131,6 +131,8 @@ void init_tim6(void) {
     TIM6->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
     NVIC->ISER[0] = 1 << 17;
+    //Set TIM6 a lower priority than TIM7
+    NVIC_SetPriority(TIM6_DAC_IRQn, 2); //Priority 2
     //Enable counter
     TIM6->CR1 |= TIM_CR1_CEN;
     //TIM6->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
@@ -148,6 +150,8 @@ void init_tim7(void) {
     TIM7->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
     NVIC->ISER[0] = 0x01 << TIM7_IRQn;
+    //Set TIM7 a higher priority than TIM6
+    NVIC_SetPriority(TIM7_IRQn, 1); // Priority 1
     //Enable counter
     TIM7->CR1 |= TIM_CR1_CEN;
     //TIM7->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
