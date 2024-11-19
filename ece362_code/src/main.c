@@ -124,7 +124,7 @@ void init_tim6(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
     //Set prescaler to 10,000
-    TIM6->PSC = 10-1;
+    TIM6->PSC = 500-1;
     //Calculate ARR for 20 Hz interrupt rate
     TIM6->ARR = 4800-1;
     //Enable update interrupt
@@ -143,9 +143,9 @@ void init_tim7(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
     //Set prescaler to 10,000 - 1
-    TIM7->PSC = 100 - 1;
+    TIM7->PSC = 500 - 1;
     //Calculate ARR for 0.5 Hz interrupt rate
-    TIM6->ARR = (9600) - 1;
+    TIM6->ARR = 48000 - 1;
     //Enable update interrupt
     TIM7->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
