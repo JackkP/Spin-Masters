@@ -14,6 +14,7 @@
 #include "spi.h"
 #include "sdcard.h"
 #include "commands.h"
+// #include "i2c.h"
 
 void nano_wait(int);
 void internal_clock();
