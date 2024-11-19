@@ -210,3 +210,79 @@ void accel_read(uint16_t loc, char data[], uint8_t len) {
     i2c_senddata(EEPROM_ADDR, bytes, 2);
     i2c_recvdata(EEPROM_ADDR, data, len);
 }
+
+//===========================================================================
+// Configure interrupt pins, all of interest to non-default pin (INT1)
+//===========================================================================
+
+void config_int_pins() {
+    // Configuration occurs in the CTRL_REG5 (0x2E)
+    // identifies TRANS, LNDPRT, DRDY
+    char intList = 0x31; // 0011 0001
+    accel_write(0x2E, intList, 8);
+}
+
+//===========================================================================
+// Read in the interrupt status and direct to interrupt handling
+//===========================================================================
+
+int detect_interrupt() {
+    // there will be 3 types of interrupts we will care about:
+    // 0 [PRI2]: data ready (DRDY) - there has been a change or overwrite to accel data
+    // 4 [PRI1]: landscape/portrait orientation (LNDPRT) - change in device orientation
+    // 5 [PRI0]: transient interrupt (TRANS) - there is change to 
+
+    // check whether interrupt has been raised
+    uint8_t int_stat[1];
+    // read from int_source (0x0C)
+    uint16_t interrupts = accel_read(0x0C, int_stat, 8);
+
+    // check interrupt status in order of relative priority
+    // still want every interrupt to run
+    if (interrupts == 0x0) {
+        return -1;
+    }
+
+    if ((interrupts && (1<<5)) == 1)
+    {
+        // call transient interrupt stuff
+        return 5;
+    }
+    if ((interrupts && (1<<4)) == 1)
+    {
+        // call landscape stuff
+        return 4;
+    }
+
+    if ((interrupts && (1)) == 1) {
+        // call readXYZ
+        return 0;
+    }
+}
+
+void get_accel_XYZ() {
+    uint8_t accel_dataX[];
+    uint8_t accel_dataY[];
+    uint8_t accel_dataZ[];
+
+    // read data from the status register of accelerometer
+    
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+
+    // data package arrange as:
+    // 
+
+}
+void set_accel_XYZ() {
+
+}
+
+void detect_shake() {
+
+}
+
+void detect_tilt() {
+
+}
