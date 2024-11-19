@@ -192,23 +192,82 @@ void TIM7_IRQHandler(){
     //save current screen to SD card
 }
 
+void config_int_pins() {
+    // Configuration occurs in the CTRL_REG5 (0x2E)
+    // identifies TRANS, LNDPRT, DRDY
+    char intList = 0x31; // 0011 0001
+    accel_write(0x2E, intList, 8);
+}
+
+void set_motion_limits() {
+    // set the threshold limits for the transient interrupt
+    char force[] = 0b1010000;
+    accel_write(0x1F, force, 8);
+}
+
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
     
-    SYSCFG->EXTICR[0] |= 0x0; // cover PA0
+    SYSCFG->EXTICR[1] |= ; // cover PA0
 
     // trigger on the rising edge
-    EXTI->RTSR |= 0x0000001d; // 0001 1101
-    EXTI->IMR |= 0x0000001d;
+    EXTI->RTSR |= 0x1; // only need pin PA7
+    EXTI->IMR |= 0x1; // also only need pin PA7
 
-    NVIC->ISER[0] |= 1<<EXTI0_1_IRQn;
-    NVIC->ISER[0] |= 1<<EXTI2_3_IRQn;
-    NVIC->ISER[0] |= 1<<EXTI4_15_IRQn;
+    NVIC->ISER[0] |= 1<<EXTI4_15_IRQn; // call interrupt handler
 }
 
-void EXTI0_1_IRQHandler() {
-    EXTI->PR = EXTI_PR_PR0;
-    togglexn(GPIOB, 8);
+void EXTI4_15_IRQHandler() {
+    // check whether interrupt has been raised
+    uint8_t int_stat[1];
+    // read from int_source (0x0C)
+    // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
+    uint16_t interrupts = accel_read(0x0C, int_stat, 8);
+
+    // check interrupt status in order of relative priority
+    // still want every interrupt to run
+    if (interrupts == 0x0) {
+        return;
+    }
+
+    if ((interrupts && (1<<5)) == 1)
+    {
+        // acknowledge interrupt
+        LCD_Clear();
+        // call transient interrupt stuff
+    }
+    if ((interrupts && (1<<4)) == 1)
+    {
+        // acknowledge interrupt
+        LCD_Clear();
+        // call landscape stuff
+    }
+
+    if ((interrupts && (1)) == 1) {
+        // acknowledge
+        // call readXYZ
+    }
+    
+    return;
+}
+
+void get_accel_XYZ() {
+    uint8_t accel_dataX[];
+    uint8_t accel_dataY[];
+    uint8_t accel_dataZ[];
+
+    // read data from the status register of accelerometer
+    
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+    uint8_t accelX = accel_read(0x00, accel_data, 8);
+
+    // data package arrange as:
+    // 
+
+}
+void set_accel_XYZ() {
+
 }
 
 int main(void) {
