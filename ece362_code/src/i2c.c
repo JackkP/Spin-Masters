@@ -1,5 +1,6 @@
 #include "stm32f0xx.h"
 #include <stdio.h>
+#include "i2c.h"
 
 void internal_clock();
 void enable_ports();
@@ -191,7 +192,7 @@ int i2c_checknack(void) {
 
 #define EEPROM_ADDR 0x57
 
-void eeprom_write(uint16_t loc, const char* data, uint8_t len) {
+void accel_write(uint16_t loc, const char* data, uint8_t len) {
     uint8_t bytes[34];
     bytes[0] = loc>>8;
     bytes[1] = loc&0xFF;
@@ -201,132 +202,11 @@ void eeprom_write(uint16_t loc, const char* data, uint8_t len) {
     i2c_senddata(EEPROM_ADDR, bytes, len+2);
 }
 
-void eeprom_read(uint16_t loc, char data[], uint8_t len) {
+void accel_read(uint16_t loc, char data[], uint8_t len) {
     // ... your code here
     uint8_t bytes[2];
     bytes[0] = loc>>8;
     bytes[1] = loc&0xFF;
     i2c_senddata(EEPROM_ADDR, bytes, 2);
     i2c_recvdata(EEPROM_ADDR, data, len);
-}
-
-//===========================================================================
-// Copy in code from Lab 7 - USART
-//===========================================================================
-
-#include "fifo.h"
-#include "tty.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#define FIFOSIZE 16
-char serfifo[FIFOSIZE];
-int seroffset = 0;
-
-//===========================================================================
-// init_usart5
-//===========================================================================
-void init_usart5() {
-    RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
-    RCC->AHBENR |= RCC_AHBENR_GPIODEN;
-
-    // configure pin PC12 to be routed to USART5_TX
-    GPIOC->MODER &= ~GPIO_MODER_MODER12; // reset pin 12
-    GPIOC->MODER |= GPIO_MODER_MODER12_1; // set pin 12 to alternate function mode
-    GPIOC->AFR[1] &= ~GPIO_AFRH_AFRH4;
-    GPIOC->AFR[1] |= 2 << GPIO_AFRH_AFRH4_Pos; // AFRH configured to AF2 for USART5_TX
-
-    //configure pin PD2 to be routed to USART5_RX
-    GPIOD->MODER &= ~GPIO_MODER_MODER2; // reset pin 2
-    GPIOD->MODER |= GPIO_MODER_MODER2_1; // set pin 2 to af mode
-    GPIOD->AFR[0] &= ~GPIO_AFRL_AFRL2;
-    GPIOD->AFR[0] |= 2 << GPIO_AFRL_AFRL2_Pos; // AFRL configured to AFR2 for USART5_RX
-
-    RCC->APB1ENR |= RCC_APB1ENR_USART5EN;
-
-    USART5->CR1 &= ~USART_CR1_UE; // disable UE bit
-    USART5->CR1 &= ~(USART_CR1_M1 | USART_CR1_M0);// set word size to 8 bits
-    USART5->CR2 &= ~(USART_CR2_STOP_0 | USART_CR2_STOP_1);// set one stop bit
-    USART5->CR1 &= ~USART_CR1_PCE; // set no partiy control 
-    USART5->CR1 &= ~USART_CR1_OVER8; // use 16x oversampling
-    USART5->BRR = 0x1A1; // baud rate of 115200 - double check
-    USART5->CR1 |= (USART_CR1_TE | USART_CR1_RE); // enable transmitter and receiver
-    USART5->CR1 |= USART_CR1_UE; // enable USART
-    while (!(USART5->ISR & (USART_ISR_TEACK | USART_ISR_REACK))); // wait for TE and RE to be acknowledged
-}
-
-//===========================================================================
-// enable_tty_interrupt
-//===========================================================================
-void enable_tty_interrupt(void) {
-    // TODO
-    USART5->CR1 |= USART_CR1_RTOIE;
-    USART5->CR3 |= USART_CR3_EIE;
-    NVIC->ISER[0] = 1 << USART3_8_IRQn; // table 37 | interrupts from stm32f091xc.h
-
-    RCC->AHBENR |= RCC_AHBENR_DMA2EN;
-    DMA2->CSELR |= DMA2_CSELR_CH2_USART5_RX;
-    DMA2_Channel2->CCR &= ~DMA_CCR_EN;  // First make sure DMA is turned off
-    DMA2_Channel2->CMAR = serfifo;
-    DMA2_Channel2->CPAR = USART5->RDR;
-    DMA2_Channel2->CNDTR = FIFOSIZE;
-    DMA2_Channel2->CCR |= DMA_CCR_DIR;
-    DMA2_Channel2->CCR &= ~(DMA_CCR_TCIE | DMA_CCR_HTIE); // disable total-completion and half-transfer
-    DMA2_Channel2->CCR &= ~DMA_CCR_MSIZE;
-    DMA2_Channel2->CCR &= ~DMA_CCR_PSIZE;
-    DMA2_Channel2->CCR |= DMA_CCR_MINC;
-    DMA2_Channel2->CCR |= DMA_CCR_PINC;
-    DMA2_Channel2->CCR |= DMA_CCR_CIRC;
-    DMA2_Channel2->CCR &= ~DMA_CCR_MEM2MEM;
-    DMA2_Channel2->CCR |= (DMA_CCR_PL_0 | DMA_CCR_PL_1);
-    DMA2_Channel2->CCR |= DMA_CCR_EN;
-
-}
-
-//===========================================================================
-// interrupt_getchar
-//===========================================================================
-char interrupt_getchar() {
-    USART_TypeDef *u = USART5;
-    // Wait for a newline to complete the buffer.
-    while(fifo_newline(&input_fifo) == 0) {
-        while (!(u->ISR & USART_ISR_RXNE))
-            ;
-        insert_echo_char(u->RDR);
-    }
-    // Return a character from the line buffer.
-    char ch = fifo_remove(&input_fifo);
-    return ch;
-}
-
-//===========================================================================
-// __io_putchar
-//===========================================================================
-int __io_putchar(int c) {
-    if (c == '\n') {
-        while(!(USART5->ISR & USART_ISR_TXE));
-        USART5->TDR = '\r';
-    }
-    while(!(USART5->ISR & USART_ISR_TXE));
-    USART5->TDR = c;
-    return c;
-}
-
-//===========================================================================
-// __io_getchar
-//===========================================================================
-int __io_getchar(void) {
-    return interrupt_getchar();
-}
-
-//===========================================================================
-// IRQHandler for USART5
-//===========================================================================
-void USART3_8_IRQHandler(void) {
-    while(DMA2_Channel2->CNDTR != sizeof serfifo - seroffset) {
-        if (!fifo_full(&input_fifo))
-            insert_echo_char(serfifo[seroffset]);
-        seroffset = (seroffset + 1) % sizeof serfifo;
-    }
 }
