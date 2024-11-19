@@ -192,6 +192,25 @@ void TIM7_IRQHandler(){
     //save current screen to SD card
 }
 
+void init_exti() {
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
+    
+    SYSCFG->EXTICR[0] |= 0x0; // cover PA0
+
+    // trigger on the rising edge
+    EXTI->RTSR |= 0x0000001d; // 0001 1101
+    EXTI->IMR |= 0x0000001d;
+
+    NVIC->ISER[0] |= 1<<EXTI0_1_IRQn;
+    NVIC->ISER[0] |= 1<<EXTI2_3_IRQn;
+    NVIC->ISER[0] |= 1<<EXTI4_15_IRQn;
+}
+
+void EXTI0_1_IRQHandler() {
+    EXTI->PR = EXTI_PR_PR0;
+    togglexn(GPIOB, 8);
+}
+
 int main(void) {
     internal_clock();
     //call setup functions
