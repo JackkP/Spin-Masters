@@ -223,9 +223,20 @@ void config_int_pins() {
 }
 
 //===========================================================================
+// Set transient threshold limit through THS_Register (0x1F)
+//===========================================================================
+
+void set_motion_limits() {
+    // set the threshold limits for the transient interrupt
+    char force[] = 0b1010000;
+    accel_write(0x1F, force, 8)
+}
+
+//===========================================================================
 // Read in the interrupt status and direct to interrupt handling
 //===========================================================================
 
+// will need to adjust to make this proper exti function
 int detect_interrupt() {
     // there will be 3 types of interrupts we will care about:
     // 0 [PRI2]: data ready (DRDY) - there has been a change or overwrite to accel data
