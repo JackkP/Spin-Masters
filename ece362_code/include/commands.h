@@ -6,6 +6,7 @@ struct commands_t {
     void      (*fn)(int argc, char *argv[]);
 };
 
-void command_shell(void);
+void makefile();
+void mount();
 
 #endif /* __COMMANDS_H_ */

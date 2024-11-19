@@ -25,7 +25,6 @@ void init_spi1() {
     RCC->APB2ENR |= RCC_APB2ENR_SPI1EN; //enable clock to spi1
     SPI1->CR1 &= ~(SPI_CR1_SPE); //disable the SPI channel
     SPI1->CR1 &= ~(SPI_CR1_BR); //set the baud rate to 12 MHz
-
     SPI1->CR1 |= SPI_CR1_BR_0;
 
     SPI1->CR1 |= SPI_CR1_MSTR; //set to master mode
@@ -37,12 +36,14 @@ void init_spi1() {
     SPI1->CR1 |= SPI_CR1_SPE; //enable the SPI channel
 }
 
-//init slow spi1 for low speed spi used for SD card init
+//init slow spi1 for low speed spi used for SD card init //init spi1 MUST be called before this
 void init_spi1_slow() {
-    //Set the baud rate divisor to the maximum value to make the SPI baud rate as low as possible.
-    //Set it to "Master Mode".
-    //Set the word (data) size to 8-bit.
-    //Configure "Software Slave Management" and "Internal Slave Select".
-    //Set the "FIFO reception threshold" bit in CR2 so that the SPI channel immediately releases a received 8-bit value.
-    //Enable the SPI channel.
+
+    SPI1->CR1 &= ~(SPI_CR1_SPE); //disable the SPI channel
+    SPI1->CR1 &= ~(SPI_CR1_BR); //Set the baud rate divisor to the maximum value to make the SPI baud rate as low as possible.
+    SPI1->CR1 |= SPI_CR1_MSTR; //Set it to "Master Mode".
+    SPI1->CR2 &= ~(SPI_CR2_DS); //Set the word (data) size to 8-bit (* by writing zeros the register is reset to 8 bit default)
+    SPI1->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; //Configure "Software Slave Management" and "Internal Slave Select".
+    SPI1->CR2 |= SPI_CR2_FRXTH; //Set the "FIFO reception threshold" bit in CR2 so that the SPI channel immediately releases a received 8-bit value.
+    SPI1->CR1 |= SPI_CR1_SPE; //enable the SPI channel
 }

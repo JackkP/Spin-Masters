@@ -103,28 +103,29 @@ uint32_t get_fattime(void)
     return u.value;
 }
 
+/*
 //todo: remake into read function
 void cat(int argc, char *argv[])
 {
     for(int i=1; i<argc; i++) {
-        FIL fil;        /* File object */
-        char line[100]; /* Line buffer */
-        FRESULT fr;     /* FatFs return code */
+        FIL fil;        // File object
+        char line[100]; // Line buffer
+        FRESULT fr;     // FatFs return code
 
-        /* Open a text file */
+        // Open a text file
         fr = f_open(&fil, argv[i], FA_READ);
         if (fr) {
             print_error(fr, argv[i]);
             return;
         }
 
-        /* Read every line and display it */
+        // Read every line and display it
         while(f_gets(line, sizeof line, &fil))
             printf(line);
-        /* Close the file */
+        // Close the file
         f_close(&fil);
     }
-}
+} */
 
 // useful function to convert string to integer
 int to_int(char *start, char *end, int base)
@@ -157,16 +158,16 @@ void date()
     set_fattime(2024, 11, 18, 10, 30, 0);
 }
 
-//todo modify into make new file and write entire char array to it
+/*//todo modify into make new file and write entire char array to it
 void input(int argc, char *argv[])
 {
     if (argc != 2) {
         printf("Specify only one file name to create.");
         return;
     }
-    FIL fil;        /* File object */
-    char line[100]; /* Line buffer */
-    FRESULT fr;     /* FatFs return code */
+    FIL fil;        //File object
+    char line[100]; //Line buffer
+    FRESULT fr;     //FatFs return code
     fr = f_open(&fil, argv[1], FA_WRITE|FA_CREATE_NEW);
     if (fr) {
         print_error(fr, argv[1]);
@@ -185,6 +186,14 @@ void input(int argc, char *argv[])
         if (fr)
             print_error(fr, argv[1]);
     }
+    f_close(&fil);
+}*/
+
+void makefile(){
+    FIL fil;
+    char fname[9] = {"holyfuck\0"};
+    FRESULT fr;
+    fr = f_open(&fil, fname, FA_WRITE|FA_CREATE_NEW);
     f_close(&fil);
 }
 
