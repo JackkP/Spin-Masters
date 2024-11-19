@@ -36,7 +36,7 @@ void init_spi1() {
     SPI1->CR1 |= SPI_CR1_SPE; //enable the SPI channel
 }
 
-//init slow spi1 for low speed spi used for SD card init //init spi1 MUST be called before this
+//init slow spi1 for low speed spi used for SD card init, init spi1 MUST be called before this
 void init_spi1_slow() {
 
     SPI1->CR1 &= ~(SPI_CR1_SPE); //disable the SPI channel

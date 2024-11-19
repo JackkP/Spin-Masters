@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include "lcd.h"
 #include "spi.h"
+#include "sdcard.h"
+#include "commands.h"
 
 void nano_wait(int);
 void internal_clock();
@@ -45,20 +47,22 @@ void init_dmas(void) {
    //DMA1 -> CSELR |= DMA1_CSELR_CH1_ADC;// Channel Select ADC on 1
    //DMA1 -> CSELR |= DMA1_CSELR_CH2_ADC;// Channel Select ADC on 2
 
-   DMA1_Channel1 -> CCR &= ~DMA_CCR_EN; // X
-   DMA1_Channel2 -> CCR &= ~DMA_CCR_EN; // Y
+   DMA1_Channel1 -> CCR &= ~DMA_CCR_EN; //ignore -> // X
+   //DMA1_Channel2 -> CCR &= ~DMA_CCR_EN; // Y
    
    DMA1_Channel1 -> CMAR = (uint32_t) xyVals;
    DMA1_Channel1 -> CPAR = (uint32_t) &(ADC1 -> DR);
    DMA1_Channel1 -> CNDTR = 0x2;
    DMA1_Channel1 -> CCR &= ~(DMA_CCR_DIR); // read from peripheral
-   DMA1_Channel1 -> CCR |= DMA_CCR_MINC;
-   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // may not need circ?
-   DMA1_Channel1 -> CCR |= DMA_CCR_TEIE;
+   DMA1_Channel1 -> CCR |= DMA_CCR_MINC; // memory increment
+   DMA1_Channel1 -> CCR |= DMA_CCR_CIRC; // Circular mode
+   // DMA1_Channel1 -> CCR |= DMA_CCR_TEIE; // do not want a transfier error interrupt
    //DMA1_Channel1 -> CCR &= ~(DMA_CCR_MSIZE); // 00 - 8b
    //DMA1_Channel1 -> CCR &= ~(DMA_CCR_PSIZE); // 00 - 8b
-   DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // 01 - 16b
-   DMA1_Channel1 -> CCR |= DMA_CCR_PSIZE_0; // 01 - 16b
+   DMA1_Channel1 -> CCR |= DMA_CCR_MSIZE_0; // memory size 01 -> 16b since using 16 bit integers
+   DMA1_Channel1 -> CCR |= DMA_CCR_PSIZE_0; //set peripheral value size to 16b
+
+   DMA1_Channel1 -> CCR |= DMA_CCR_EN; //enable the DMA
 
    /* Do we still need DMA for pgrid?
    DMA1_Channel3 -> CMAR = (uint32_t) &pgrid;
@@ -82,41 +86,39 @@ void enable_dmas(void) {
 }
 
 void setup_adcs(void) {
-    RCC -> AHBENR |= RCC_AHBENR_GPIOAEN;
+    RCC -> AHBENR |= RCC_AHBENR_GPIOAEN; //enable clock to port A
 
-    GPIOA -> MODER |= (GPIO_MODER_MODER1); //PA1 Analog
-    GPIOA -> MODER |= (GPIO_MODER_MODER0); //PA0
+    GPIOA -> MODER |= (GPIO_MODER_MODER1); //set PA1 to Analog mode
+    GPIOA -> MODER |= (GPIO_MODER_MODER0); //set PA0 to Analog mode
 
     RCC -> APB2ENR |= RCC_APB2ENR_ADC1EN; //Enable ADC1
-    ADC1 -> CFGR1 |= ADC_CFGR1_DMAEN;
-    ADC1 -> CFGR1 |= ADC_CFGR1_DMACFG;
     
-    RCC -> CR2 |= RCC_CR2_HSI14ON; //Clock?
-    while((RCC -> CR2 & RCC_CR2_HSI14RDY) == 0);
+    RCC -> CR2 |= RCC_CR2_HSI14ON; //turn on the internal 14MHz clock
+    while((RCC -> CR2 & RCC_CR2_HSI14RDY) == 0); //wait for 14MHz clock to be ready
     ADC1 -> CR |= ADC_CR_ADEN; //Enable ADC
-    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
+    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0); //wait for the ADC to be ready
+
+    ADC1->CHSELR = 0x1 << 1; //select ADC channel 1;
+    while(!(ADC1->ISR & ADC_ISR_ADRDY)); //wait for the ADC to be ready
+
+    //these steps must happen after ADC calibration per pg251 of FRM (we don't do ADC calibration here so doesn't matter)
+    ADC1 -> CFGR1 |= ADC_CFGR1_DMAEN; //enable DMA transfer request upon ADC conversion completion
+    ADC1 -> CFGR1 |= ADC_CFGR1_DMACFG; //set DMA transfer request to circular mode
+
 }
 
 void readXY(void) {
-    //SYSCFG -> CFGR1 &= ~(0b100000000);
-    //Use DMA Channel 1 (X)
-    ADC1 -> CHSELR = 0;
-    ADC1 -> CHSELR = 0b1;
-    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
-    ADC1 -> CR |= ADC_CR_ADSTART;
-    //while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
-    //xVal = ADC1->DR; //replace with triggering a DMA transfer
-    //DMA1 -> IFCR |= 0xff;
+    //Use DMA Channel 1
+    
+    ADC1 -> CHSELR = 0b1; // set channel selection register to channel 1
+    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0); //wait for ADC to be ready
+    ADC1 -> CR |= ADC_CR_ADSTART; //start ADC conversion
+    while((ADC1 -> CR & ADC_CR_ADSTART) != 0); //wait until the conversion is done
 
-    //SYSCFG -> CFGR1 |= 0b100000000;
-    //Use DMA Channel 2 (Y)
-    ADC1 -> CHSELR = 0;
-    ADC1 -> CHSELR = 0b10;
-    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0);
+    ADC1 -> CHSELR = 0b10; // set channel selection register to channel 2
+    while((ADC1 -> ISR & ADC_ISR_ADRDY) == 0); //wait for previous transfer to finish
     ADC1 -> CR |= ADC_CR_ADSTART;
-    //while((ADC1 -> ISR & ADC_ISR_EOC) == 0);
-    //yVal = ADC1->DR; //replace with triggering a DMA transfer
-    //DMA1 -> IFCR |= 0xff;
+    while((ADC1 -> CR & ADC_CR_ADSTART) != 0); //wait until the conversion is done
 }
 
 //used as an interrupt to refresh the LCD display & read the acceleration at 20Hz
@@ -125,14 +127,14 @@ void init_tim6(void) {
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
     //Set prescaler to 10,000
     TIM6->PSC = 500-1;
-    //Calculate ARR for 20 Hz interrupt rate
-    TIM6->ARR = 4800-1;
+    //Calculate ARR for 200 Hz interrupt rate
+    TIM6->ARR = 480-1;
     //Enable update interrupt
     TIM6->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
     NVIC->ISER[0] = 1 << 17;
-    //Set TIM6 a lower priority than TIM7
-    NVIC_SetPriority(TIM6_DAC_IRQn, 2); //Priority 2
+    // changing this so tim6 and tim7 have same interrupt priority so one must complete before the other can //Set TIM6 a lower priority than TIM7
+    // NVIC_SetPriority(TIM6_DAC_IRQn, 2); //Priority 2
     //Enable counter
     TIM6->CR1 |= TIM_CR1_CEN;
     //TIM6->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
@@ -150,8 +152,8 @@ void init_tim7(void) {
     TIM7->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
     NVIC->ISER[0] = 0x01 << TIM7_IRQn;
-    //Set TIM7 a higher priority than TIM6
-    NVIC_SetPriority(TIM7_IRQn, 1); // Priority 1
+    // changing this so tim6 and tim7 have same interrupt priority so one must complete before the other can //Set TIM7 a higher priority than TIM6
+    // NVIC_SetPriority(TIM7_IRQn, 1); // Priority 1
     //Enable counter
     TIM7->CR1 |= TIM_CR1_CEN;
     //TIM7->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
@@ -197,12 +199,16 @@ int main(void) {
     enable_dmas();
     
     //init_I2C();
+
     init_spi1();
+
+    //mount();
+
     LCD_Setup();
     LCD_Clear(WHITE);
     
     init_tim6();
-    init_tim7();
+    //init_tim7();
 
     for(;;);
 }
