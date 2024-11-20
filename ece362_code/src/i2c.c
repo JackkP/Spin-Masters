@@ -121,11 +121,13 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
             }
         }
         // mask data[i] with I2C_TXDR_TXDATA to make sure only 8 bits long, write to TXDR
-        I2C1->TXDR |= I2C_TXDR_TXDATA_Msk & data[i];
+
+        I2C1->TXDR = 0xFF & data[i];
+
     }
     
     // wait until transmission complete and not acknowledge are set
-    while (!(I2C1->ISR & (I2C_ISR_TC & I2C_ISR_NACKF)) == 0) {}
+    while (!(I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
 
     // if end reached without acknowledging data, unsuccessful
     if (i2c_checknack()) { return -1; }
@@ -138,17 +140,18 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
 //===========================================================================
 // Receive size chars from the I2C bus at targadr and store in data[size].
 //===========================================================================
-int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
+int i2c_recvdata(uint8_t targadr, uint8_t *data, uint8_t size) {
+
     // wait until I2C idle 
     i2c_waitidle();
 
     // send a start condition to the target address with the read bit set (dir=1)
     i2c_start(targadr, size, 1);
 
-    int count = 0;
     // start a loop from 0 to size-1 and do the following for each iteration
     for (int i = 0; i <= size - 1; i++) {
         // wait until the RXNE flag is set in the ISR, and quit if it takes too long
+        int count = 0;
         while ((I2C1->ISR & I2C_ISR_RXNE) == 0) {
             count += 1;
             if (count > 1000000)
@@ -160,9 +163,12 @@ int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
             }
         }
         // mask data in the RXDR register with I2C_RXDR_RXDATA to make sure only 8 bits, store in data[i]
-        data++;
-        data = (I2C1->RXDR & I2C_RXDR_RXDATA_Msk);
+        // data += sizeof(*data);
+        data[i] = (I2C1->RXDR & 0xFF);
+        
     }
+    
+    return 0;
 }
 
 //===========================================================================

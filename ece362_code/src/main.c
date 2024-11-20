@@ -192,6 +192,8 @@ void TIM7_IRQHandler(){
     //save current screen to SD card
 }
 
+// chaos commences
+
 void config_int_pins() {
     // Configuration occurs in the CTRL_REG5 (0x2E)
     // identifies TRANS, LNDPRT, DRDY
@@ -219,7 +221,7 @@ void init_exti() {
 
 void EXTI4_15_IRQHandler() {
     // check whether interrupt has been raised
-    uint8_t int_stat[1];
+    char int_stat[1];
     // read from int_source (0x0C)
     // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     uint16_t interrupts = accel_read(0x0C, int_stat, 8);
@@ -233,13 +235,13 @@ void EXTI4_15_IRQHandler() {
     if ((interrupts && (1<<5)) == 1)
     {
         // acknowledge interrupt
-        LCD_Clear();
+        LCD_Clear(0);
         // call transient interrupt stuff
     }
     if ((interrupts && (1<<4)) == 1)
     {
         // acknowledge interrupt
-        LCD_Clear();
+        LCD_Clear(0);
         // call landscape stuff
     }
 
