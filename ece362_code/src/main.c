@@ -262,20 +262,21 @@ void EXTI4_15_IRQHandler() {
     }
 }
 
-void get_accel_XYZ() {
-    uint8_t accel_dataX[];
-    uint8_t accel_dataY[];
-    uint8_t accel_dataZ[];
+uint32_t get_accel_XYZ() {
+    uint8_t accel_dataX[1];
+    uint8_t accel_dataY[1];
+    uint8_t accel_dataZ[1];
 
     // read data from the status register of accelerometer
-    
-    uint8_t accelX = accel_read(0x00, accel_data, 8);
-    uint8_t accelX = accel_read(0x00, accel_data, 8);
-    uint8_t accelX = accel_read(0x00, accel_data, 8);
+    // only getting MSB because i don't think 14 bits is necessary
+    accel_read(0x01, accel_dataX, 1);
+    accel_read(0x03, accel_dataY, 1);
+    accel_read(0x05, accel_dataZ, 1);
 
-    // data package arrange as:
-    // 
+    // data = 0ZYX
+    uint32_t accel_data = (accel_dataZ << 16) + (accel_dataY << 8) + accel_dataX;
 
+    return accel_data;
 }
 
 
