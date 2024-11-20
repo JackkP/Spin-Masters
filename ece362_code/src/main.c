@@ -198,19 +198,24 @@ void config_int_pins() {
     // Configuration occurs in the CTRL_REG5 (0x2E)
     // identifies TRANS, LNDPRT, DRDY
     char intList = 0x31; // 0011 0001
-    accel_write(0x2E, intList, 8);
+    accel_write(0x2E, intList, 1);
 }
 
 void set_motion_limits() {
     // set the threshold limits for the transient interrupt
-    char force[] = 0b1010000;
-    accel_write(0x1F, force, 8);
+    char force[1] = 0b1010000; // accel of roughly 3g's
+    // write the acceleration threshold limit to the transient threshold register
+    accel_write(0x1F, force, 1);
+}
+
+void set_tilt_limits() {
+    // 
 }
 
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
     
-    SYSCFG->EXTICR[1] |= ; // cover PA0
+    SYSCFG->EXTICR[1] |= ; // cover PA7
 
     // trigger on the rising edge
     EXTI->RTSR |= 0x1; // only need pin PA7
@@ -224,33 +229,37 @@ void EXTI4_15_IRQHandler() {
     char int_stat[1];
     // read from int_source (0x0C)
     // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
-    uint16_t interrupts = accel_read(0x0C, int_stat, 8);
+    accel_read(0x0C, int_stat, 1);
 
     // check interrupt status in order of relative priority
-    // still want every interrupt to run
-    if (interrupts == 0x0) {
-        return;
+    if ((int_stat && (1<<5)) == 1)
+    {
+        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat &= (~(1<<5));
+        accel_write(0x2D, int_stat, 1);
+
+        // clear the screen
+        LCD_Clear(0);
     }
 
-    if ((interrupts && (1<<5)) == 1)
+    if ((int_stat && (1<<4)) == 1)
     {
-        // acknowledge interrupt
+        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat &= (~(1<<4));
+        accel_write(0x2D, int_stat, 1);
+
+        // clear screen
         LCD_Clear(0);
-        // call transient interrupt stuff
-    }
-    if ((interrupts && (1<<4)) == 1)
-    {
-        // acknowledge interrupt
-        LCD_Clear(0);
-        // call landscape stuff
     }
 
-    if ((interrupts && (1)) == 1) {
-        // acknowledge
-        // call readXYZ
+    if ((int_stat && (1)) == 1) {
+        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat &= (~(1<<0));
+        accel_write(0x2D, int_stat, 1);
+
+        // call new values for X,Y,Z
+        get_accel_XYZ();
     }
-    
-    return;
 }
 
 void get_accel_XYZ() {
@@ -268,9 +277,7 @@ void get_accel_XYZ() {
     // 
 
 }
-void set_accel_XYZ() {
 
-}
 
 int main(void) {
     internal_clock();
