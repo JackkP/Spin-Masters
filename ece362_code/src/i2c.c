@@ -196,7 +196,7 @@ int i2c_checknack(void) {
 // We'll give these so you don't have to figure out how to write to the EEPROM.
 // These can differ by device.
 
-#define EEPROM_ADDR 0x57
+#define ACCEL_ADDR 0x1D
 
 void accel_write(uint16_t loc, const char* data, uint8_t len) {
     uint8_t bytes[34];
@@ -205,17 +205,34 @@ void accel_write(uint16_t loc, const char* data, uint8_t len) {
     for(int i = 0; i<len; i++){
         bytes[i+2] = data[i];
     }
-    i2c_senddata(EEPROM_ADDR, bytes, len+2);
+    i2c_senddata(ACCEL_ADDR, bytes, len+2);
 }
 
 void accel_read(uint16_t loc, char data[], uint8_t len) {
-    // ... your code here
     uint8_t bytes[2];
     bytes[0] = loc>>8;
     bytes[1] = loc&0xFF;
-    i2c_senddata(EEPROM_ADDR, bytes, 2);
-    i2c_recvdata(EEPROM_ADDR, data, len);
+    i2c_senddata(ACCEL_ADDR, bytes, 2);
+    i2c_recvdata(ACCEL_ADDR, data, len);
 }
+
+// void accel_write(uint16_t loc, const char* data, uint8_t len) {
+//     uint8_t bytes[34];
+//     bytes[0] = loc>>8;
+//     bytes[1] = loc&0xFF;
+//     for(int i = 0; i<len; i++){
+//         bytes[i+2] = data[i];
+//     }
+//     i2c_senddata(ACCEL_ADDR, bytes, len+2);
+// }
+
+// void accel_read(uint16_t loc, char data[], uint8_t len) {
+//     uint8_t bytes[2];
+//     bytes[0] = loc>>8;
+//     bytes[1] = loc&0xFF;
+//     i2c_senddata(ACCEL_ADDR, bytes, 2);
+//     i2c_recvdata(ACCEL_ADDR, data, len);
+// }
 
 //===========================================================================
 // Configure interrupt pins, all of interest to non-default pin (INT1)

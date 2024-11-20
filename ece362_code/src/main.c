@@ -14,15 +14,15 @@
 #include "spi.h"
 #include "sdcard.h"
 #include "commands.h"
-// #include "i2c.h"
+#include "i2c.h"
 
 void nano_wait(int);
 void internal_clock();
 // // i2c stuff
-// void enable_ports();
-// void init_i2c();
-// void accel_write(uint16_t loc, const char* data, uint8_t len);
-// void accel_read(uint16_t loc, char data[], uint8_t len);
+void enable_ports();
+void init_i2c();
+void accel_write(uint16_t loc, const char* data, uint8_t len);
+void accel_read(uint16_t loc, char data[], uint8_t len);
 
 uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
 //uint16_t xVal = 0; //analog xvalue
@@ -203,19 +203,21 @@ void config_int_pins() {
     // Configuration occurs in the CTRL_REG5 (0x2E)
     // identifies TRANS, LNDPRT, DRDY
     char intList = 0x31; // 0011 0001
-    accel_write(0x2E, intList, 1);
+    accel_write(0x2E, &intList, 1);
 }
 
 void set_motion_limits() {
     // set the threshold limits for the transient interrupt
-    char force[1] = 0b1010000; // accel of roughly 3g's
+    char force[1] = 0b01010000; // accel of roughly 3g's
     // write the acceleration threshold limit to the transient threshold register
     accel_write(0x1F, force, 1);
 }
 
-void set_tilt_limits() {
-    // 
-}
+//omit setting tilt limits, default already at +/-75 degrees
+// void set_tilt_limits() {
+//     // set the back/front trip angle threshold to be above 75 degrees
+//     char tilt[1] = 
+// }
 
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
@@ -237,29 +239,29 @@ void EXTI4_15_IRQHandler() {
     accel_read(0x0C, int_stat, 1);
 
     // check interrupt status in order of relative priority
-    if ((int_stat && (1<<5)) == 1)
+    if ((int_stat[0] && (1<<5)) == 1)
     {
         // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat &= (~(1<<5));
+        int_stat[0] &= (~(1<<5));
         accel_write(0x2D, int_stat, 1);
 
         // clear the screen
-        LCD_Clear(0);
+        LCD_Clear(WHITE);
     }
 
-    if ((int_stat && (1<<4)) == 1)
+    if ((int_stat[0] && (1<<4)) == 1)
     {
         // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat &= (~(1<<4));
+        int_stat[0] &= (~(1<<4));
         accel_write(0x2D, int_stat, 1);
 
         // clear screen
-        LCD_Clear(0);
+        LCD_Clear(WHITE);
     }
 
-    if ((int_stat && (1)) == 1) {
+    if ((int_stat[0] && (1)) == 1) {
         // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat &= (~(1<<0));
+        int_stat[0] &= (~(1<<0));
         accel_write(0x2D, int_stat, 1);
 
         // call new values for X,Y,Z
@@ -279,7 +281,7 @@ uint32_t get_accel_XYZ() {
     accel_read(0x05, accel_dataZ, 1);
 
     // data = 0ZYX
-    uint32_t accel_data = (accel_dataZ << 16) + (accel_dataY << 8) + accel_dataX;
+    uint32_t accel_data = (*accel_dataZ << 16) + (*accel_dataY << 8) + *accel_dataX;
 
     return accel_data;
 }
@@ -292,7 +294,11 @@ int main(void) {
     init_dmas();
     enable_dmas();
     
-    //init_I2C();
+    enable_ports();
+    init_i2c();
+    init_exti();
+    config_int_pins();
+    set_motion_limits();
 
     init_spi1();
 
