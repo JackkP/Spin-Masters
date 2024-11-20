@@ -18,6 +18,11 @@
 
 void nano_wait(int);
 void internal_clock();
+// // i2c stuff
+// void enable_ports();
+// void init_i2c();
+// void accel_write(uint16_t loc, const char* data, uint8_t len);
+// void accel_read(uint16_t loc, char data[], uint8_t len);
 
 uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
 //uint16_t xVal = 0; //analog xvalue
