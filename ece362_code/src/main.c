@@ -21,8 +21,8 @@ void internal_clock();
 // // i2c stuff
 void enable_ports();
 void init_i2c();
-void accel_write(uint16_t loc, const char* data, uint8_t len);
-void accel_read(uint16_t loc, char data[], uint8_t len);
+void accel_write(uint16_t loc, uint8_t* data, uint8_t len);
+void accel_read(uint16_t loc, uint8_t data[], uint8_t len);
 
 uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
 //uint16_t xVal = 0; //analog xvalue
@@ -44,6 +44,11 @@ uint16_t zhist[30]; //z value history
 //some type of grid to represent the pixels
 
 static uint8_t pgrid[40][240]; //(represent with a 0/1)
+
+// acceleration variables from i2c
+uint8_t accel_dataX[1];
+uint8_t accel_dataY[1];
+uint8_t accel_dataZ[1];
 
 int led_curr = 0;
 
@@ -202,13 +207,15 @@ void TIM7_IRQHandler(){
 void config_int_pins() {
     // Configuration occurs in the CTRL_REG5 (0x2E)
     // identifies TRANS, LNDPRT, DRDY
-    char intList = 0x31; // 0011 0001
-    accel_write(0x2E, &intList, 1);
+    uint8_t intList[1];
+    intList[0] = 0x31; // 0011 0001
+    accel_write(0x2E, intList, 1);
 }
 
 void set_motion_limits() {
     // set the threshold limits for the transient interrupt
-    char force[1] = 0b01010000; // accel of roughly 3g's
+    uint8_t force[1];
+    force[0] = 0x30; // accel of roughly 3g's
     // write the acceleration threshold limit to the transient threshold register
     accel_write(0x1F, force, 1);
 }
@@ -233,7 +240,7 @@ void init_exti() {
 
 void EXTI4_15_IRQHandler() {
     // check whether interrupt has been raised
-    char int_stat[1];
+    uint8_t int_stat[1];
     // read from int_source (0x0C)
     // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     accel_read(0x0C, int_stat, 1);
@@ -265,25 +272,16 @@ void EXTI4_15_IRQHandler() {
         accel_write(0x2D, int_stat, 1);
 
         // call new values for X,Y,Z
-        get_accel_XYZ();
+        update_accel_XYZ();
     }
 }
 
-uint32_t get_accel_XYZ() {
-    uint8_t accel_dataX[1];
-    uint8_t accel_dataY[1];
-    uint8_t accel_dataZ[1];
-
+void update_accel_XYZ() {
     // read data from the status register of accelerometer
     // only getting MSB because i don't think 14 bits is necessary
     accel_read(0x01, accel_dataX, 1);
     accel_read(0x03, accel_dataY, 1);
     accel_read(0x05, accel_dataZ, 1);
-
-    // data = 0ZYX
-    uint32_t accel_data = (*accel_dataZ << 16) + (*accel_dataY << 8) + *accel_dataX;
-
-    return accel_data;
 }
 
 
