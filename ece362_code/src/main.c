@@ -24,6 +24,8 @@ void init_i2c();
 void accel_write(uint16_t loc, uint8_t* data, uint8_t len);
 void accel_read(uint16_t loc, uint8_t data[], uint8_t len);
 
+void update_accel_XYZ(); // for some reason it prefers it like this
+
 uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
 //uint16_t xVal = 0; //analog xvalue
 //uint16_t yVal = 0; //analog yvalue
@@ -46,9 +48,9 @@ uint16_t zhist[30]; //z value history
 static uint8_t pgrid[40][240]; //(represent with a 0/1)
 
 // acceleration variables from i2c
-uint8_t accel_dataX[1];
-uint8_t accel_dataY[1];
-uint8_t accel_dataZ[1];
+uint8_t accel_dataX[1]; // x-axis accelerometer data
+uint8_t accel_dataY[1]; // y-axis accelerometer data
+uint8_t accel_dataZ[1]; // z-axis accelerometer data
 
 int led_curr = 0;
 
@@ -248,7 +250,7 @@ void EXTI4_15_IRQHandler() {
     // check interrupt status in order of relative priority
     if ((int_stat[0] && (1<<5)) == 1)
     {
-        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        // acknowledge transient interrupt - disable correct bit, set to CTRL_REG4 
         int_stat[0] &= (~(1<<5));
         accel_write(0x2D, int_stat, 1);
 
@@ -258,16 +260,16 @@ void EXTI4_15_IRQHandler() {
 
     if ((int_stat[0] && (1<<4)) == 1)
     {
-        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        // acknowledge orientation interrupt - disable correct bit, set to CTRL_REG4 
         int_stat[0] &= (~(1<<4));
         accel_write(0x2D, int_stat, 1);
 
         // clear screen
-        LCD_Clear(WHITE);
+        //LCD_Clear(WHITE);
     }
 
     if ((int_stat[0] && (1)) == 1) {
-        // acknowledge interrupt - disable correct bit, set to CTRL_REG4 
+        // acknowledge data ready interrupt - disable correct bit, set to CTRL_REG4 
         int_stat[0] &= (~(1<<0));
         accel_write(0x2D, int_stat, 1);
 
