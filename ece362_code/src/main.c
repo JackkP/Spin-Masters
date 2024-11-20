@@ -215,11 +215,11 @@ void set_tilt_limits() {
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
     
-    SYSCFG->EXTICR[1] |= ; // cover PA7
+    SYSCFG->EXTICR[1] &= ~(0x1000); // cover EXTI7 for PA
 
     // trigger on the rising edge
-    EXTI->RTSR |= 0x1; // only need pin PA7
-    EXTI->IMR |= 0x1; // also only need pin PA7
+    EXTI->RTSR |= 1<<7; // only need pin PA7
+    EXTI->IMR |= 1<<7; // also only need pin PA7
 
     NVIC->ISER[0] |= 1<<EXTI4_15_IRQn; // call interrupt handler
 }
