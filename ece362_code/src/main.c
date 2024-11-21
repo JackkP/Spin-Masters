@@ -23,6 +23,7 @@ void enable_ports();
 void init_i2c();
 void accel_write(uint16_t loc, uint8_t* data, uint8_t len);
 void accel_read(uint16_t loc, uint8_t data[], uint8_t len);
+void i2c_stop();
 
 void update_accel_XYZ(); // for some reason it prefers it like this
 
@@ -206,6 +207,12 @@ void TIM7_IRQHandler(){
 
 // chaos commences
 
+void config_accel() {
+    uint8_t config[1];
+    config[0] = 0x1;
+    accel_write(0x2A, config, 1);
+}
+
 void config_int_pins() {
     // Configuration occurs in the CTRL_REG5 (0x2E)
     // identifies TRANS, LNDPRT, DRDY
@@ -230,8 +237,10 @@ void set_motion_limits() {
 
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
+
+    GPIOA->MODER |= GPIO_MODER_MODER7;
     
-    SYSCFG->EXTICR[1] &= ~(0x1000); // cover EXTI7 for PA
+    SYSCFG->EXTICR[1] &= ~(0xF000); // cover EXTI7 for PA
 
     // trigger on the rising edge
     EXTI->RTSR |= 1<<7; // only need pin PA7
@@ -241,11 +250,21 @@ void init_exti() {
 }
 
 void EXTI4_15_IRQHandler() {
+    EXTI->PR |= EXTI_PR_PR7;
     // check whether interrupt has been raised
     uint8_t int_stat[1];
     // read from int_source (0x0C)
     // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
-    accel_read(0x0C, int_stat, 1);
+    accel_read(0x0C, int_stat, 1); 
+    GPIOC->ODR &= ~(1 << 6);
+    // if (led_curr == 1) {
+    //     GPIOC->ODR |= 1 << 6;
+    //     led_curr = 0;
+    // }
+    // else {
+    //     GPIOC->ODR &= ~(1 << 6);
+    //     led_curr = 1;   
+    // }
 
     // check interrupt status in order of relative priority
     if ((int_stat[0] && (1<<5)) == 1)
@@ -273,8 +292,10 @@ void EXTI4_15_IRQHandler() {
         int_stat[0] &= (~(1<<0));
         accel_write(0x2D, int_stat, 1);
 
-        // call new values for X,Y,Z
-        update_accel_XYZ();
+        
+
+        // // call new values for X,Y,Z
+        // update_accel_XYZ();
     }
 }
 
@@ -298,9 +319,17 @@ int main(void) {
     init_i2c();
     init_exti();
     config_int_pins();
+    config_accel();
+    // i2c_stop();
     set_motion_limits();
 
     init_spi1();
+    // uint8_t int_stat[1];
+    // // read from int_source (0x0C)
+    // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
+    // accel_read(0x0C, int_stat, 1); 
+    while (1)
+        update_accel_XYZ();
 
     //mount();
 

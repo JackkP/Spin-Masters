@@ -21,7 +21,7 @@ void enable_ports(void) {
     // configure PA9->I2C1_SCL (GPIOA-AF4), PA10->I2C1_SDA (GPIOA-AF4)
     GPIOA->MODER &= ~(GPIO_MODER_MODER9 | GPIO_MODER_MODER10); // reset PA9&PA10
     GPIOA->MODER |= GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1; // configure PA9&PA10 to AF mode
-    GPIOA->AFR[1] |= (3 << GPIO_AFRH_AFRH2_Pos) | (3 << GPIO_AFRH_AFRH1_Pos); // AFR to AF4
+    GPIOA->AFR[1] |= (4 << GPIO_AFRH_AFRH2_Pos) | (4 << GPIO_AFRH_AFRH1_Pos); // AFR to AF4
 }
 
 //===========================================================================
@@ -39,11 +39,21 @@ void init_i2c(void) {
     I2C1->CR1 |= I2C_CR1_ANFOFF | I2C_CR1_ERRIE | I2C_CR1_NOSTRETCH; 
     
     // set the I2C to "fast mode" @400kHz
-    I2C1->TIMINGR = (u_int32_t) 0x00B01A4B; // hex number came from example don't ask me about it
+    //prescaler 5
+    //scll 0x9
+    //sclh 0x3
+    //sdadel 0x3
+    //scldel 0x3
+    // I2C1->TIMINGR = 0;
+    I2C1->TIMINGR |= (5 << I2C_TIMINGR_PRESC_Pos) | (0x9 << I2C_TIMINGR_SCLL_Pos);
+    I2C1->TIMINGR |= (0x3 << I2C_TIMINGR_SCLH_Pos) | (0x3 << I2C_TIMINGR_SDADEL_Pos);
+    I2C1->TIMINGR |= (0x3 << I2C_TIMINGR_SCLDEL_Pos);
+    // I2C1->TIMINGR = (u_int32_t) 0x00B01A4B; // hex number came from example don't ask me about it
     
-    I2C1->CR2 &= ~I2C_CR2_ADD10; // 7-bit addressing, not 10-bit (for master mode)
+    I2C1->CR2 &= ~(I2C_CR2_ADD10 | I2C_CR2_AUTOEND); // 7-bit addressing, not 10-bit (for master mode)
     // I2C1->CR2 |= I2C_CR2_STOP; // send STOP conditon after last byte of transmission
     //** check here ^ for potential issues */
+    // I2C1->CR2 |= I2C_CR2_AUTOEND;
 
     I2C1->CR1 |= I2C_CR1_PE; // enable peripheral after programming
 }
@@ -77,8 +87,9 @@ void i2c_start(uint32_t targadr, uint8_t size, uint8_t dir) {
 void i2c_stop(void) {
     // 0. If a STOP bit has already been sent, return from the function.
     // Check the I2C1 ISR register for the corresponding bit.    
-    if (I2C_ISR_STOPF) {
-        return;
+    if ((I2C1->ISR & I2C_ISR_STOPF)) {
+        // return;
+        I2C1->ICR |= 1 << I2C_ICR_STOPCF_Pos; // resets the STOP flag clear bit
     }
 
     // 1. Set the STOP bit in the CR2 register.
@@ -87,8 +98,11 @@ void i2c_stop(void) {
     // 2. Wait until STOPF flag is reset by checking the same flag in ISR.
     while (!(I2C1->ISR & I2C_ISR_STOPF) == 0) {    }
 
+
     // 3. Clear the STOPF flag by writing 0 to the corresponding bit in the ICR.
     I2C1->ICR |= 1 << I2C_ICR_STOPCF_Pos; // resets the STOP flag clear bit
+    while (!(I2C1->ISR & I2C_ISR_STOPF) == 0) {    }
+
 }
 
 //===========================================================================
@@ -108,8 +122,8 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
     // send a start condition to the target address with the write bit set (dir=0)
     i2c_start(targadr, size, 0);
 
-    int count = 0;
     for (int i = 0; i <= size - 1; i++) {
+        int count = 0;
         while ((I2C1->ISR & I2C_ISR_TXIS) == 0) {
             count += 1;
             if (count > 1000000)
@@ -121,13 +135,11 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
             }
         }
         // mask data[i] with I2C_TXDR_TXDATA to make sure only 8 bits long, write to TXDR
-
-        I2C1->TXDR = 0xFF & data[i];
-
+        I2C1->TXDR = I2C_TXDR_TXDATA & data[i];
     }
     
     // wait until transmission complete and not acknowledge are set
-    while (!(I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
+    while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
 
     // if end reached without acknowledging data, unsuccessful
     if (i2c_checknack()) { return -1; }
@@ -164,9 +176,10 @@ int i2c_recvdata(uint8_t targadr, uint8_t *data, uint8_t size) {
         }
         // mask data in the RXDR register with I2C_RXDR_RXDATA to make sure only 8 bits, store in data[i]
         // data += sizeof(*data);
-        data[i] = (I2C1->RXDR & 0xFF);
+        data[i] = (I2C1->RXDR & I2C_TXDR_TXDATA);
         
     }
+    i2c_stop();
     
     return 0;
 }
@@ -184,11 +197,7 @@ void i2c_clearnack(void) {
 //===========================================================================
 int i2c_checknack(void) {
     // check to make sure the NACK flag is cleared
-    if (!I2C_ISR_NACKF) {
-        return 1;
-    } else {
-        return 0;
-    }
+    if (I2C1->ISR & I2C_ISR_NACKF) { return 1; }
 }
 
 //===========================================================================
@@ -200,19 +209,19 @@ int i2c_checknack(void) {
 
 void accel_write(uint16_t loc, uint8_t* data, uint8_t len) {
     uint8_t bytes[34];
-    bytes[0] = loc>>8;
-    bytes[1] = loc&0xFF;
+    // bytes[0] = loc>>8;
+    bytes[0] = loc&0xFF;
     for(int i = 0; i<len; i++){
-        bytes[i+2] = data[i];
+        bytes[i+1] = data[i];
     }
-    i2c_senddata(ACCEL_ADDR, bytes, len+2);
+    i2c_senddata(ACCEL_ADDR, bytes, len+1);
 }
 
 void accel_read(uint16_t loc, uint8_t data[], uint8_t len) {
     uint8_t bytes[2];
-    bytes[0] = loc>>8;
-    bytes[1] = loc&0xFF;
-    i2c_senddata(ACCEL_ADDR, bytes, 2);
+    // bytes[0] = loc>>8;
+    bytes[0] = loc&0xFF;
+    i2c_senddata(ACCEL_ADDR, bytes, 1);
     i2c_recvdata(ACCEL_ADDR, data, len);
 }
 
