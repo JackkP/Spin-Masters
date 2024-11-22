@@ -14,9 +14,18 @@
 #include "spi.h"
 #include "sdcard.h"
 #include "commands.h"
+#include "i2c.h"
 
 void nano_wait(int);
 void internal_clock();
+// // i2c stuff
+void enable_ports();
+void init_i2c();
+void accel_write(uint16_t loc, uint8_t* data, uint8_t len);
+void accel_read(uint16_t loc, uint8_t data[], uint8_t len);
+void i2c_stop();
+
+void update_accel_XYZ(); // for some reason it prefers it like this
 
 uint16_t xyVals[2] = {0, 0}; //analog xvalue [0] and yvalue [1]
 //uint16_t xVal = 0; //analog xvalue
@@ -38,6 +47,11 @@ uint16_t zhist[30]; //z value history
 //some type of grid to represent the pixels
 
 static uint8_t pgrid[40][240]; //(represent with a 0/1)
+
+// acceleration variables from i2c
+uint8_t accel_dataX[1]; // x-axis accelerometer data
+uint8_t accel_dataY[1]; // y-axis accelerometer data
+uint8_t accel_dataZ[1]; // z-axis accelerometer data
 
 int led_curr = 0;
 
@@ -191,6 +205,109 @@ void TIM7_IRQHandler(){
     //save current screen to SD card
 }
 
+// chaos commences
+
+void config_accel() {
+    uint8_t config[1];
+    config[0] = 0x1;
+    accel_write(0x2A, config, 1);
+}
+
+void config_int_pins() {
+    // Configuration occurs in the CTRL_REG5 (0x2E)
+    // identifies TRANS, LNDPRT, DRDY
+    uint8_t intList[1];
+    intList[0] = 0x31; // 0011 0001
+    accel_write(0x2E, intList, 1);
+}
+
+void set_motion_limits() {
+    // set the threshold limits for the transient interrupt
+    uint8_t force[1];
+    force[0] = 0x30; // accel of roughly 3g's
+    // write the acceleration threshold limit to the transient threshold register
+    accel_write(0x1F, force, 1);
+}
+
+//omit setting tilt limits, default already at +/-75 degrees
+// void set_tilt_limits() {
+//     // set the back/front trip angle threshold to be above 75 degrees
+//     char tilt[1] = 
+// }
+
+void init_exti() {
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
+
+    GPIOA->MODER |= GPIO_MODER_MODER7;
+    
+    SYSCFG->EXTICR[1] &= ~(0xF000); // cover EXTI7 for PA
+
+    // trigger on the rising edge
+    EXTI->RTSR |= 1<<7; // only need pin PA7
+    EXTI->IMR |= 1<<7; // also only need pin PA7
+
+    NVIC->ISER[0] |= 1<<EXTI4_15_IRQn; // call interrupt handler
+}
+
+void EXTI4_15_IRQHandler() {
+    EXTI->PR |= EXTI_PR_PR7;
+    // check whether interrupt has been raised
+    uint8_t int_stat[1];
+    // read from int_source (0x0C)
+    // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
+    accel_read(0x0C, int_stat, 1); 
+    GPIOC->ODR &= ~(1 << 6);
+    // if (led_curr == 1) {
+    //     GPIOC->ODR |= 1 << 6;
+    //     led_curr = 0;
+    // }
+    // else {
+    //     GPIOC->ODR &= ~(1 << 6);
+    //     led_curr = 1;   
+    // }
+
+    // check interrupt status in order of relative priority
+    if ((int_stat[0] && (1<<5)) == 1)
+    {
+        // acknowledge transient interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat[0] &= (~(1<<5));
+        accel_write(0x2D, int_stat, 1);
+
+        // clear the screen
+        LCD_Clear(WHITE);
+    }
+
+    if ((int_stat[0] && (1<<4)) == 1)
+    {
+        // acknowledge orientation interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat[0] &= (~(1<<4));
+        accel_write(0x2D, int_stat, 1);
+
+        // clear screen
+        //LCD_Clear(WHITE);
+    }
+
+    if ((int_stat[0] && (1)) == 1) {
+        // acknowledge data ready interrupt - disable correct bit, set to CTRL_REG4 
+        int_stat[0] &= (~(1<<0));
+        accel_write(0x2D, int_stat, 1);
+
+        
+
+        // // call new values for X,Y,Z
+        // update_accel_XYZ();
+    }
+}
+
+void update_accel_XYZ() {
+    // read data from the status register of accelerometer
+    // only getting MSB because i don't think 14 bits is necessary
+    accel_read(0x01, accel_dataX, 1);
+    accel_read(0x03, accel_dataY, 1);
+    accel_read(0x05, accel_dataZ, 1);
+}
+
+
 int main(void) {
     internal_clock();
     //call setup functions
@@ -198,9 +315,21 @@ int main(void) {
     init_dmas();
     enable_dmas();
     
-    //init_I2C();
+    enable_ports();
+    init_i2c();
+    init_exti();
+    config_int_pins();
+    config_accel();
+    // i2c_stop();
+    set_motion_limits();
 
     init_spi1();
+    // uint8_t int_stat[1];
+    // // read from int_source (0x0C)
+    // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
+    // accel_read(0x0C, int_stat, 1); 
+    while (1)
+        update_accel_XYZ();
 
     //mount();
 
