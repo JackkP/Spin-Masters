@@ -7,7 +7,8 @@ struct commands_t {
 };
 
 void mount();
-void write_screen(int pagenum, uint8_t* data, int datasize);
+void save_screen(int pagenum, uint8_t* data, int datasize);
+int load_screen(int pagenum, uint8_t* buf, int datasize);
 void LCD_setDisp(uint8_t* data);
 
 #endif /* __COMMANDS_H_ */

@@ -46,7 +46,7 @@ uint16_t zhist[30]; //z value history
 
 //some type of grid to represent the pixels
 
-static uint8_t pgrid[40][240]; //(represent with a 0/1)
+static uint8_t pgrid[9600]; //(represent with a 0/1)
 
 // acceleration variables from i2c
 uint8_t accel_dataX[1]; // x-axis accelerometer data
@@ -139,7 +139,7 @@ void readXY(void) {
 void init_tim6(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
-    //Set prescaler to 10,000
+    //Set prescaler to 500
     TIM6->PSC = 500-1;
     //Calculate ARR for 200 Hz interrupt rate
     TIM6->ARR = 480-1;
@@ -158,10 +158,10 @@ void init_tim6(void) {
 void init_tim7(void) {
     //Enable RCC clock for TIM6
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
-    //Set prescaler to 10,000 - 1
-    TIM7->PSC = 500 - 1;
-    //Calculate ARR for 0.5 Hz interrupt rate
-    TIM6->ARR = 48000 - 1;
+    //Set prescaler to 5,000 - 1
+    TIM7->PSC = 5000 - 1;
+    //Calculate ARR for 0.2 Hz interrupt rate
+    TIM7->ARR = 48000 - 1;
     //Enable update interrupt
     TIM7->DIER |= TIM_DIER_UIE;
     //Unmask the interrupt in the NVIC
@@ -182,27 +182,30 @@ void TIM6_IRQHandler(){
     TIM6->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     //read X and Y
     readXY();
-    xCurr = (xyVals[0])*240/4095;
-    yCurr = (xyVals[1])*320/4096; // Should these denomenators be the same?
+    xCurr = (xyVals[0])*239/4095;
+    yCurr = (xyVals[1])*319/4095;
+    //draw point
     LCD_DrawPoint(xCurr, yCurr, BLACK);
+    //update this point in the pgrid
+    int p_curr = xCurr*320 + yCurr;
+    pgrid[p_curr/8] |= 1 << p_curr % 8;
+
     //check for shaking
     //if shaking clear screen, save, wait till acelerometer is restored to flat
     //if tilting save screen and switch
-    //update screen
 }
 
 void TIM7_IRQHandler(){
     TIM7->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     
-    if (led_curr == 1) {
-        GPIOC->ODR |= 1 << 6;
-        led_curr = 0;
-    }
-    else {
-        GPIOC->ODR &= ~(1 << 6);
-        led_curr = 1;   
-    }
+    //toggle LED on and off when savings
+    GPIOC->ODR |= 1 << 6;
+    
     //save current screen to SD card
+    save_screen(screen, pgrid, 9600);
+
+    GPIOC->ODR &= ~(1 << 6);
+
 }
 
 // chaos commences
@@ -318,26 +321,29 @@ int main(void) {
     enable_ports();
     init_i2c();
     init_exti();
-    config_int_pins();
-    config_accel();
+    //config_int_pins();
+    //config_accel();
     // i2c_stop();
-    set_motion_limits();
+    //set_motion_limits();
 
-    init_spi1();
     // uint8_t int_stat[1];
     // // read from int_source (0x0C)
     // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     // accel_read(0x0C, int_stat, 1); 
-    while (1)
-        update_accel_XYZ();
+    //while (1)
+    //    update_accel_XYZ();
 
+    init_spi1();
     //mount();
 
     LCD_Setup();
+
     LCD_Clear(WHITE);
+    load_screen(screen, pgrid, 9600);
+    LCD_setDisp(pgrid);
     
     init_tim6();
-    //init_tim7();
+    init_tim7();
 
     for(;;);
 }

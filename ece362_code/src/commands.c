@@ -103,21 +103,29 @@ uint32_t get_fattime(void)
     return u.value;
 }
 
-//make a new file and write a long array of bytes to it
-int read_screen(int pagenum, uint8_t* buf, int datasize) {
+//check if a file exists and read a long array of bytes from it
+int load_screen(int pagenum, uint8_t* buf, int datasize) {
+    FATFS *fs = &fs_storage;
+    FRESULT res = f_mount(fs, "", 1);
+
     FIL fil;
     //set filename to be page number (null terminated string)
     char fname[2] = {" \0"};
     fname[0] = pagenum + 48;
     FRESULT fr;
     //open the file to read
-    fr = f_open(&fil, fname, FA_READ);
-    if (fr != FR_OK) return 0;
+    fr = f_open(&fil, fname, FA_READ | FA_OPEN_EXISTING);
+    if (fr != FR_OK) {
+        fr = f_close(&fil);
+        res = f_mount(fs, "", 1);
+        return 0;
+    }
     //read every byte from the file into the buffer
     int br;
     f_read(&fil, buf, datasize, &br);
     //close file
-    f_close(&fil);
+    fr = f_close(&fil);
+    res = f_mount(fs, "", 1);
     return br;
 }
 
@@ -131,19 +139,24 @@ int to_int(char *start, char *end, int base)
 }
 
 //make a new file and write a long array of bytes to it
-void write_screen(int pagenum, uint8_t* data, int datasize) {
+void save_screen(int pagenum, uint8_t* data, int datasize) {
+    FATFS *fs = &fs_storage;
+    FRESULT res = f_mount(fs, "", 1);
+    
     FIL fil;
     //set filename to be page number (null terminated string)
     char fname[2] = {" \0"};
     fname[0] = pagenum + 48;
-    f_unlink(fname);
+    res = f_unlink(fname);
     //open the file to write or create new file
-    f_open(&fil, fname, FA_WRITE|FA_CREATE_NEW);
+    res = f_open(&fil, fname, FA_WRITE|FA_CREATE_NEW);
     //write every byte to the file
     int bw;
-    f_write(&fil, data, datasize, &bw);
+    res = f_write(&fil, data, datasize, &bw);
+    res = f_sync(&fil);
     //close file
-    f_close(&fil);
+    res = f_close(&fil);
+    res = f_mount(fs, "", 1);
 }
 
 // mount file system
@@ -154,20 +167,9 @@ void mount()
         // error, system already mounted
         return;
     }
-    int res = f_mount(fs, "", 1);
+    FRESULT res = f_mount(fs, "", 1);
     if (res != FR_OK)
         return; //error occurred while mounting
-}
-
-// remove file by filename
-void rm(int argc, char *filename)
-{
-    FRESULT res;
-    for(int i=1; i<argc; i++) {
-        res = f_unlink(filename);
-        if (res != FR_OK) ;
-            // error, unable to remove filename but we don't really care
-    }
 }
 
 //set display pixels based on bit-array
@@ -175,10 +177,11 @@ void LCD_setDisp(uint8_t* data){
     int x, y;
     for (x = 0; x < 240; x++){
         for (y=0; y<320; y++){
-            int p_curr = x*240 + y;
-            if ((data[p_curr >> 3] & 1 << p_curr % 8) != 0){
-                LCD_DrawPoint(x, y, WHITE);
-            }  
+            int p_curr = x*320 + y;
+            if ((data[p_curr/8] & (1 << (p_curr % 8))) != 0){
+                LCD_DrawPoint(x, y, BLACK);
+            }
+
         }
     }
 }
