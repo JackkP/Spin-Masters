@@ -6,7 +6,8 @@ struct commands_t {
     void      (*fn)(int argc, char *argv[]);
 };
 
-void makefile();
 void mount();
+void write_screen(int pagenum, uint8_t* data, int datasize);
+void LCD_setDisp(uint8_t* data);
 
 #endif /* __COMMANDS_H_ */

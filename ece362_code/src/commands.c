@@ -103,29 +103,23 @@ uint32_t get_fattime(void)
     return u.value;
 }
 
-/*
-//todo: remake into read function
-void cat(int argc, char *argv[])
-{
-    for(int i=1; i<argc; i++) {
-        FIL fil;        // File object
-        char line[100]; // Line buffer
-        FRESULT fr;     // FatFs return code
-
-        // Open a text file
-        fr = f_open(&fil, argv[i], FA_READ);
-        if (fr) {
-            print_error(fr, argv[i]);
-            return;
-        }
-
-        // Read every line and display it
-        while(f_gets(line, sizeof line, &fil))
-            printf(line);
-        // Close the file
-        f_close(&fil);
-    }
-} */
+//make a new file and write a long array of bytes to it
+int read_screen(int pagenum, uint8_t* buf, int datasize) {
+    FIL fil;
+    //set filename to be page number (null terminated string)
+    char fname[2] = {" \0"};
+    fname[0] = pagenum + 48;
+    FRESULT fr;
+    //open the file to read
+    fr = f_open(&fil, fname, FA_READ);
+    if (fr != FR_OK) return 0;
+    //read every byte from the file into the buffer
+    int br;
+    f_read(&fil, buf, datasize, &br);
+    //close file
+    f_close(&fil);
+    return br;
+}
 
 // useful function to convert string to integer
 int to_int(char *start, char *end, int base)
@@ -136,64 +130,19 @@ int to_int(char *start, char *end, int base)
     return n;
 }
 
-//can leave this lmao
-static const char *month_name[] = {
-        [1] = "Jan",
-        [2] = "Feb",
-        [3] = "Mar",
-        [4] = "Apr",
-        [5] = "May",
-        [6] = "Jun",
-        [7] = "Jul",
-        [8] = "Aug",
-        [9] = "Sep",
-        [10] = "Oct",
-        [11] = "Nov",
-        [12] = "Dec",
-};
-
-//setting date to a random date close to the due date lmao
-void date()
-{
-    set_fattime(2024, 11, 18, 10, 30, 0);
-}
-
-/*//todo modify into make new file and write entire char array to it
-void input(int argc, char *argv[])
-{
-    if (argc != 2) {
-        printf("Specify only one file name to create.");
-        return;
-    }
-    FIL fil;        //File object
-    char line[100]; //Line buffer
-    FRESULT fr;     //FatFs return code
-    fr = f_open(&fil, argv[1], FA_WRITE|FA_CREATE_NEW);
-    if (fr) {
-        print_error(fr, argv[1]);
-        return;
-    }
-    printf("To end input, enter a line with a single '.'\n");
-    for(;;) {
-        fgets(line, sizeof(line)-1, stdin);
-        if (line[0] == '.' && line[1] == '\n')
-            break;
-        int len = strlen(line);
-        if (line[len-1] == '\004')
-            len -= 1;
-        UINT wlen;
-        fr = f_write(&fil, (BYTE*)line, len, &wlen);
-        if (fr)
-            print_error(fr, argv[1]);
-    }
-    f_close(&fil);
-}*/
-
-void makefile(){
+//make a new file and write a long array of bytes to it
+void write_screen(int pagenum, uint8_t* data, int datasize) {
     FIL fil;
-    char fname[9] = {"holyfuck\0"};
-    FRESULT fr;
-    fr = f_open(&fil, fname, FA_WRITE|FA_CREATE_NEW);
+    //set filename to be page number (null terminated string)
+    char fname[2] = {" \0"};
+    fname[0] = pagenum + 48;
+    f_unlink(fname);
+    //open the file to write or create new file
+    f_open(&fil, fname, FA_WRITE|FA_CREATE_NEW);
+    //write every byte to the file
+    int bw;
+    f_write(&fil, data, datasize, &bw);
+    //close file
     f_close(&fil);
 }
 
@@ -218,5 +167,18 @@ void rm(int argc, char *filename)
         res = f_unlink(filename);
         if (res != FR_OK) ;
             // error, unable to remove filename but we don't really care
+    }
+}
+
+//set display pixels based on bit-array
+void LCD_setDisp(uint8_t* data){
+    int x, y;
+    for (x = 0; x < 240; x++){
+        for (y=0; y<320; y++){
+            int p_curr = x*240 + y;
+            if ((data[p_curr >> 3] & 1 << p_curr % 8) != 0){
+                LCD_DrawPoint(x, y, WHITE);
+            }  
+        }
     }
 }
