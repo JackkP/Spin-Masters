@@ -173,7 +173,9 @@ void init_tim7(void) {
     //TIM7->CR2 |= TIM_CR2_MMS_1; do not need to do this since this is for timer synchronization
 
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;  
-    GPIOC->MODER |= GPIO_MODER_MODER6_0;
+    // GPIOC->MODER &= ~(GPIO_MODER_MODER7);
+    GPIOC->MODER |= GPIO_MODER_MODER7_0;
+    GPIOC->BRR |= 1 << 7;
 }
 
 // read the accelerometers, check for shaking/tilt
@@ -199,7 +201,7 @@ void TIM7_IRQHandler(){
     TIM7->SR &= ~TIM_SR_UIF; //acknowledge the interrupt'
     
     //toggle LED on and off when savings
-    GPIOC->ODR |= 1 << 6;
+    // GPIOC->ODR |= 1 << 6;
     
     //save current screen to SD card
     save_screen(screen, pgrid, 9600);
@@ -212,7 +214,7 @@ void TIM7_IRQHandler(){
 
 void config_accel() {
     uint8_t config[1];
-    config[0] = 0x1;
+    config[0] = 0x3;
     accel_write(0x2A, config, 1);
 }
 
@@ -241,7 +243,7 @@ void set_motion_limits() {
 void init_exti() {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN; 
 
-    GPIOA->MODER |= GPIO_MODER_MODER7;
+    // GPIOA->MODER |= GPIO_MODER_MODER7_0;
     
     SYSCFG->EXTICR[1] &= ~(0xF000); // cover EXTI7 for PA
 
@@ -259,7 +261,7 @@ void EXTI4_15_IRQHandler() {
     // read from int_source (0x0C)
     // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     accel_read(0x0C, int_stat, 1); 
-    GPIOC->ODR &= ~(1 << 6);
+    GPIOC->ODR |= 1 << 7;
     // if (led_curr == 1) {
     //     GPIOC->ODR |= 1 << 6;
     //     led_curr = 0;
@@ -268,35 +270,44 @@ void EXTI4_15_IRQHandler() {
     //     GPIOC->ODR &= ~(1 << 6);
     //     led_curr = 1;   
     // }
+    // GPIOC->ODR &= ~(1 << 6);
 
     // check interrupt status in order of relative priority
     if ((int_stat[0] && (1<<5)) == 1)
     {
         // acknowledge transient interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat[0] &= (~(1<<5));
-        accel_write(0x2D, int_stat, 1);
+        // int_stat[0] &= (~(1<<5));
+        // accel_write(0x2D, int_stat, 1);
 
         // clear the screen
-        LCD_Clear(WHITE);
+        for (int i = 0; i<9600; i++)
+            pgrid[i] = 0;
+        save_screen(screen, pgrid, 9600);
+        LCD_setDisp(pgrid);
     }
 
     if ((int_stat[0] && (1<<4)) == 1)
     {
         // acknowledge orientation interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat[0] &= (~(1<<4));
-        accel_write(0x2D, int_stat, 1);
+        // int_stat[0] &= (~(1<<4));
+        // accel_write(0x2D, int_stat, 1);
 
-        // clear screen
-        //LCD_Clear(WHITE);
+        // switch screen
+        for (int i = 0; i<9600; i++)
+            pgrid[i] = 0;
+        // save_grid(screen, pgrid);
+        // screen = updated_screen;
+        load_screen(screen, pgrid, 9600);
+        LCD_setDisp(pgrid);
     }
 
     if ((int_stat[0] && (1)) == 1) {
         // acknowledge data ready interrupt - disable correct bit, set to CTRL_REG4 
-        int_stat[0] &= (~(1<<0));
-        accel_write(0x2D, int_stat, 1);
+        // int_stat[0] &= (~(1<<0));
+        // accel_write(0x2D, int_stat, 1);
 
         // // call new values for X,Y,Z
-        // update_accel_XYZ();
+        update_accel_XYZ();
     }
 }
 
@@ -372,6 +383,8 @@ int main(void) {
     init_dmas();
     enable_dmas();
     
+    
+    
     enable_ports();
     init_i2c();
     init_exti();
@@ -384,8 +397,10 @@ int main(void) {
     // // read from int_source (0x0C)
     // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     // accel_read(0x0C, int_stat, 1); 
-    while (1)
-       update_accel_XYZ();
+    // while (1)
+    // update_accel_XYZ();
+    uint8_t int_stat[1];
+    accel_read(0x0C, int_stat, 1); 
 
     init_spi1();
     //mount();
@@ -396,8 +411,12 @@ int main(void) {
     load_screen(screen, pgrid, 9600);
     LCD_setDisp(pgrid);
     
-    init_tim6();
+
+    // uint8_t int_stat[1];
+    // int_stat[0] &= (~(1<<5));
+    // accel_write(0x2D, int_stat, 1);
     init_tim7();
+    init_tim6();
 
     for(;;);
 }
