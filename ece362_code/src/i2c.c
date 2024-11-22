@@ -158,7 +158,7 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
 //===========================================================================
 // Receive size chars from the I2C bus at targadr and store in data[size].
 //===========================================================================
-int i2c_recvdata(uint8_t targadr, uint8_t *data, uint8_t size) {
+int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
 
     // wait until I2C idle 
     i2c_waitidle();
@@ -219,19 +219,19 @@ int i2c_checknack(void) {
 
 void accel_write(uint16_t loc, uint8_t* data, uint8_t len) {
     uint8_t bytes[34];
-    bytes[0] = loc>>8;
-    bytes[1] = loc&0xFF;
+    // bytes[0] = loc>>8;
+    bytes[0] = loc&0xFF;
     for(int i = 0; i<len; i++){
         bytes[i+1] = data[i];
     }
-    i2c_senddata(ACCEL_ADDR, bytes, len+2);
+    i2c_senddata(ACCEL_ADDR, bytes, len+1);
 }
 
 void accel_read(uint16_t loc, uint8_t data[], uint8_t len) {
     uint8_t bytes[2];
-    bytes[0] = loc>>8;
-    bytes[1] = loc&0xFF;
-    i2c_senddata(ACCEL_ADDR, bytes, 2);
+    // bytes[0] = loc>>8;
+    bytes[0] = loc&0xFF;
+    i2c_senddata(ACCEL_ADDR, bytes, 1);
     i2c_recvdata(ACCEL_ADDR, data, len);
 }
 
