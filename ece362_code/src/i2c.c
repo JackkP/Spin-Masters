@@ -69,6 +69,12 @@ void i2c_start(uint32_t targadr, uint8_t size, uint8_t dir) {
     tmpreg &= ~(I2C_CR2_SADD | I2C_CR2_NBYTES | I2C_CR2_RD_WRN | I2C_CR2_START | I2C_CR2_STOP);
 
     // 2. Set read/write direction in tmpreg. ** check here for potential issues
+    if (dir == 1) {
+        tmpreg |= I2C_CR2_RD_WRN;
+    }
+    else {
+        tmpreg &= ~(I2C_CR2_RD_WRN);
+    }
     tmpreg &= ~(tmpreg & (dir << I2C_CR2_RD_WRN_Pos));
 
     // 3. Set the target's address in SADD (shift targadr left by 1 bit) and the data size.
@@ -177,8 +183,12 @@ int i2c_recvdata(uint8_t targadr, uint8_t *data, uint8_t size) {
         // mask data in the RXDR register with I2C_RXDR_RXDATA to make sure only 8 bits, store in data[i]
         // data += sizeof(*data);
         data[i] = (I2C1->RXDR & I2C_TXDR_TXDATA);
-        
     }
+
+    while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
+
+    if (!(I2C1->ISR & I2C_ISR_NACKF) == 0) { return -1; }
+
     i2c_stop();
     
     return 0;
@@ -209,19 +219,19 @@ int i2c_checknack(void) {
 
 void accel_write(uint16_t loc, uint8_t* data, uint8_t len) {
     uint8_t bytes[34];
-    // bytes[0] = loc>>8;
-    bytes[0] = loc&0xFF;
+    bytes[0] = loc>>8;
+    bytes[1] = loc&0xFF;
     for(int i = 0; i<len; i++){
         bytes[i+1] = data[i];
     }
-    i2c_senddata(ACCEL_ADDR, bytes, len+1);
+    i2c_senddata(ACCEL_ADDR, bytes, len+2);
 }
 
 void accel_read(uint16_t loc, uint8_t data[], uint8_t len) {
     uint8_t bytes[2];
-    // bytes[0] = loc>>8;
-    bytes[0] = loc&0xFF;
-    i2c_senddata(ACCEL_ADDR, bytes, 1);
+    bytes[0] = loc>>8;
+    bytes[1] = loc&0xFF;
+    i2c_senddata(ACCEL_ADDR, bytes, 2);
     i2c_recvdata(ACCEL_ADDR, data, len);
 }
 

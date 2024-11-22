@@ -295,8 +295,6 @@ void EXTI4_15_IRQHandler() {
         int_stat[0] &= (~(1<<0));
         accel_write(0x2D, int_stat, 1);
 
-        
-
         // // call new values for X,Y,Z
         // update_accel_XYZ();
     }
@@ -321,17 +319,17 @@ int main(void) {
     enable_ports();
     init_i2c();
     init_exti();
-    //config_int_pins();
-    //config_accel();
+    config_int_pins();
+    config_accel();
     // i2c_stop();
-    //set_motion_limits();
+    set_motion_limits(); // should be sending data
 
-    // uint8_t int_stat[1];
+    uint8_t int_stat[1];
     // // read from int_source (0x0C)
     // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     // accel_read(0x0C, int_stat, 1); 
-    //while (1)
-    //    update_accel_XYZ();
+    while (1)
+       update_accel_XYZ();
 
     init_spi1();
     //mount();
