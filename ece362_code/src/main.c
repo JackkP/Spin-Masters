@@ -303,6 +303,62 @@ void EXTI4_15_IRQHandler() {
 void update_accel_XYZ() {
     // read data from the status register of accelerometer
     // only getting MSB because i don't think 14 bits is necessary
+    // uint8_t targadr = 0x1D;
+    // uint8_t data[1] = {0x1}; 
+    // uint8_t size = 1;
+    // i2c_start(targadr, size, 0);
+
+    // for (int i = 0; i <= size - 1; i++) {
+    //     int count = 0;
+    //     while ((I2C1->ISR & I2C_ISR_TXIS) == 0) {
+    //         count += 1;
+    //         if (count > 1000000)
+    //             return;
+    //         if (i2c_checknack()) {
+    //             i2c_clearnack();
+    //             i2c_stop();
+    //             return;
+    //         }
+    //     }
+    //     // mask data[i] with I2C_TXDR_TXDATA to make sure only 8 bits long, write to TXDR
+    //     I2C1->TXDR = I2C_TXDR_TXDATA & data[i];
+    // }
+    
+    // // wait until transmission complete and not acknowledge are set
+    // while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
+
+    // // if end reached without acknowledging data, unsuccessful
+    // if (i2c_checknack()) { return; }
+
+    // // now receiving
+    // i2c_start(targadr, size, 1);
+
+    // // start a loop from 0 to size-1 and do the following for each iteration
+    // for (int i = 0; i <= size - 1; i++) {
+    //     // wait until the RXNE flag is set in the ISR, and quit if it takes too long
+    //     int count = 0;
+    //     while ((I2C1->ISR & I2C_ISR_RXNE) == 0) {
+    //         count += 1;
+    //         if (count > 1000000)
+    //             return;
+    //         if (i2c_checknack()) {
+    //             i2c_clearnack();
+    //             i2c_stop();
+    //             return;
+    //         }
+    //     }
+    //     // mask data in the RXDR register with I2C_RXDR_RXDATA to make sure only 8 bits, store in data[i]
+    //     // data += sizeof(*data);
+    //     data[i] = (I2C1->RXDR & I2C_RXDR_RXDATA);
+    // }
+
+    // while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
+
+    // if (!(I2C1->ISR & I2C_ISR_NACKF) == 0) { return -1; }
+
+    // i2c_stop();
+    
+
     accel_read(0x01, accel_dataX, 1);
     accel_read(0x03, accel_dataY, 1);
     accel_read(0x05, accel_dataZ, 1);
@@ -324,7 +380,7 @@ int main(void) {
     // i2c_stop();
     set_motion_limits(); // should be sending data
 
-    uint8_t int_stat[1];
+    // uint8_t int_stat[1];
     // // read from int_source (0x0C)
     // // int_stat = [SRC_ASLP, SRC_FIFO, SRC_TRANS, SRC_LNDPRT, SRC_PULSE, SRC_FF_MT, --, SRC_DRDY]
     // accel_read(0x0C, int_stat, 1); 

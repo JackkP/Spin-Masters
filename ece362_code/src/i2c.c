@@ -75,7 +75,7 @@ void i2c_start(uint32_t targadr, uint8_t size, uint8_t dir) {
     else {
         tmpreg &= ~(I2C_CR2_RD_WRN);
     }
-    tmpreg &= ~(tmpreg & (dir << I2C_CR2_RD_WRN_Pos));
+    // tmpreg &= ~(tmpreg & (dir << I2C_CR2_RD_WRN_Pos));
 
     // 3. Set the target's address in SADD (shift targadr left by 1 bit) and the data size.
     tmpreg |= ((targadr<<1) & I2C_CR2_SADD) | ((size << 16) & I2C_CR2_NBYTES);
@@ -156,12 +156,49 @@ int8_t i2c_senddata(uint8_t targadr, uint8_t data[], uint8_t size) {
 }
 
 //===========================================================================
-// Receive size chars from the I2C bus at targadr and store in data[size].
+// Send each char in data[size] to the I2C bus at targadr.
 //===========================================================================
-int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
-
+int8_t i2c_senddata_restart(uint8_t targadr, uint8_t data[], uint8_t size) {
     // wait until I2C idle 
     i2c_waitidle();
+
+    // send a start condition to the target address with the write bit set (dir=0)
+    i2c_start(targadr, size, 0);
+
+    for (int i = 0; i <= size - 1; i++) {
+        int count = 0;
+        while ((I2C1->ISR & I2C_ISR_TXIS) == 0) {
+            count += 1;
+            if (count > 1000000)
+                return -1;
+            if (i2c_checknack()) {
+                i2c_clearnack();
+                i2c_stop();
+                return -1;
+            }
+        }
+        // mask data[i] with I2C_TXDR_TXDATA to make sure only 8 bits long, write to TXDR
+        I2C1->TXDR = I2C_TXDR_TXDATA & data[i];
+    }
+    
+    // wait until transmission complete and not acknowledge are set
+    while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
+
+    // if end reached without acknowledging data, unsuccessful
+    // if (i2c_checknack()) { return -1; }
+
+    // successful
+    // i2c_stop();
+    return 0;
+}
+
+//===========================================================================
+// Receive size chars from the I2C bus at targadr and store in data[size].
+//===========================================================================
+int i2c_recvdata(uint8_t targadr, u_int8_t *data, uint8_t size) {
+
+    // wait until I2C idle 
+    // i2c_waitidle();
 
     // send a start condition to the target address with the read bit set (dir=1)
     i2c_start(targadr, size, 1);
@@ -182,7 +219,7 @@ int i2c_recvdata(uint8_t targadr, void *data, uint8_t size) {
         }
         // mask data in the RXDR register with I2C_RXDR_RXDATA to make sure only 8 bits, store in data[i]
         // data += sizeof(*data);
-        data[i] = (I2C1->RXDR & I2C_TXDR_TXDATA);
+        data[i] = (I2C1->RXDR & I2C_RXDR_RXDATA);
     }
 
     while ((I2C1->ISR & (I2C_ISR_TC | I2C_ISR_NACKF)) == 0) {}
@@ -231,9 +268,9 @@ void accel_read(uint16_t loc, uint8_t data[], uint8_t len) {
     uint8_t bytes[2];
     // bytes[0] = loc>>8;
     bytes[0] = loc&0xFF;
-    i2c_senddata(ACCEL_ADDR, bytes, 1);
+    i2c_senddata_restart(ACCEL_ADDR, bytes, 1);
     i2c_recvdata(ACCEL_ADDR, data, len);
-}
+ }
 
 // void accel_write(uint16_t loc, const char* data, uint8_t len) {
 //     uint8_t bytes[34];
